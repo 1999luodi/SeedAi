@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeedAI - AI图像标注平台</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🌱 SeedAI</h1>
+                    <span class="subtitle">AI图像标注平台</span>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="index.html" class="active">首页</a></li>
+                        <li><a href="dataset.html">数据集</a></li>
+                        <li><a href="annotate.html">标注</a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h2>智能图像标注，加速AI训练</h2>
+                    <p>使用先进的AI技术，快速准确地为您的图像数据集添加标注，提升模型训练效果</p>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-number" id="totalImages">0</div>
+                            <div class="stat-label">已标注图片</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number" id="totalDatasets">0</div>
+                            <div class="stat-label">数据集</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number" id="activeUsers">0</div>
+                            <div class="stat-label">活跃用户</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="upload-section">
+            <div class="container">
+                <div class="upload-card">
+                    <h3>🚀 快速开始</h3>
+                    <p>上传您的图片，开始AI辅助标注之旅</p>
+
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <div class="upload-icon">📤</div>
+                            <div class="upload-text">
+                                <p>拖拽图片到此处，或 <span class="upload-link" id="fileSelect">点击选择</span></p>
+                                <p class="upload-hint">支持 JPG、PNG、GIF 格式，单文件最大 10MB</p>
+                            </div>
+                            <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="upload-actions">
+                        <button class="btn btn-primary" id="uploadBtn" disabled>
+                            <span class="btn-icon">⬆️</span>
+                            开始上传
+                        </button>
+                        <button class="btn btn-secondary" id="createDatasetBtn">
+                            <span class="btn-icon">📁</span>
+                            创建数据集
+                        </button>
+                    </div>
+
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">上传中...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h3>核心功能</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🤖</div>
+                        <h4>AI辅助标注</h4>
+                        <p>集成YOLOv5模型，自动识别和标注图像中的目标对象</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h4>数据集管理</h4>
+                        <p>高效的数据集组织和管理，支持批量操作和版本控制</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h4>精准标注</h4>
+                        <p>提供多种标注工具，支持矩形、点、多边形等多种标注类型</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📈</div>
+                        <h4>协作标注</h4>
+                        <p>支持多人协作标注，提高标注效率和质量</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="recent-uploads">
+            <div class="container">
+                <h3>最近上传</h3>
+                <div class="uploads-grid" id="recentUploads">
+                    <div class="empty-state">
+                        <div class="empty-icon">📷</div>
+                        <p>暂无上传记录</p>
+                        <p>开始上传您的第一张图片吧！</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>SeedAI</h4>
+                    <p>让AI标注变得简单高效</p>
+                </div>
+                <div class="footer-section">
+                    <h4>快速链接</h4>
+                    <ul>
+                        <li><a href="dataset.html">数据集管理</a></li>
+                        <li><a href="annotate.html">开始标注</a></li>
+                        <li><a href="#docs">使用文档</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>技术支持</h4>
+                    <p>基于 Flask + Vue.js + MySQL</p>
+                    <p>© 2024 SeedAI Team</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 模态框 -->
+    <div class="modal" id="createDatasetModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>创建新数据集</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createDatasetForm">
+                    <div class="form-group">
+                        <label for="datasetName">数据集名称</label>
+                        <input type="text" id="datasetName" required placeholder="输入数据集名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="datasetDescription">描述（可选）</label>
+                        <textarea id="datasetDescription" placeholder="描述您的数据集用途"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelCreate">取消</button>
+                        <button type="submit" class="btn btn-primary">创建</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

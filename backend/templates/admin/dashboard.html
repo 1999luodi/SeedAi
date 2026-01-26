@@ -1,0 +1,90 @@
+{% extends "admin/base.html" %}
+
+{% block title %}仪表板 - SeedAI 管理后台{% endblock %}
+
+{% block page_title %}仪表板{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_users or 0 }}</div>
+        <div class="stat-label">总用户数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_datasets or 0 }}</div>
+        <div class="stat-label">总数据集数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_images or 0 }}</div>
+        <div class="stat-label">总图片数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.public_datasets or 0 }}</div>
+        <div class="stat-label">公开数据集</div>
+    </div>
+</div>
+
+<div class="dashboard-sections">
+    <section class="dashboard-section">
+        <h3>快速操作</h3>
+        <div class="quick-actions">
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">管理用户</a>
+            <a href="{{ url_for('admin_datasets') }}" class="btn btn-outline">管理数据集</a>
+            <a href="{{ url_for('admin_images') }}" class="btn btn-outline">管理图片</a>
+            <a href="{{ url_for('admin_stats') }}" class="btn btn-outline">查看统计</a>
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h3>系统信息</h3>
+        <div class="system-info">
+            <p><strong>后端状态:</strong> <span style="color: var(--success-color);">正常运行</span></p>
+            <p><strong>数据库:</strong> MySQL</p>
+            <p><strong>文件存储:</strong> 本地文件系统</p>
+            <p><strong>AI 模型:</strong> PyTorch</p>
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h3>最近活动</h3>
+        <div class="recent-activity">
+            <p>暂无最近活动记录</p>
+            <!-- 这里可以添加最近的用户注册、数据集创建等活动 -->
+        </div>
+    </section>
+</div>
+
+<style>
+.quick-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.dashboard-sections {
+    display: grid;
+    gap: 2rem;
+}
+
+.dashboard-section {
+    background: var(--card-background);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.dashboard-section h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+}
+
+.system-info p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.recent-activity {
+    color: var(--text-secondary);
+}
+</style>
+{% endblock %}

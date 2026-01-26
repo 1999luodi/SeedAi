@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据集管理 - SeedAI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🌱 SeedAI</h1>
+                    <span class="subtitle">AI图像标注平台</span>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="index.html">首页</a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
+                        <li><a href="dataset.html" class="active">数据集</a></li>
+                        <li><a href="annotate.html">标注</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="page-header">
+            <div class="container">
+                <div class="page-header-content">
+                    <h2>📊 数据集管理</h2>
+                    <p>创建、管理和组织您的图像数据集</p>
+                    <div class="page-actions">
+                        <button class="btn btn-primary" id="createDatasetBtn">
+                            <span class="btn-icon">➕</span>
+                            创建数据集
+                        </button>
+                        <button class="btn btn-secondary" id="importDatasetBtn">
+                            <span class="btn-icon">📁</span>
+                            导入数据集
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- 数据集列表 -->
+            <div class="datasets-section">
+                <div class="section-header">
+                    <h3>我的数据集</h3>
+                    <div class="section-filters">
+                        <select id="sortSelect" class="form-select">
+                            <option value="newest">最新创建</option>
+                            <option value="oldest">最早创建</option>
+                            <option value="name">按名称</option>
+                            <option value="size">按大小</option>
+                        </select>
+                        <input type="text" id="searchInput" placeholder="搜索数据集..." class="form-input">
+                    </div>
+                </div>
+
+                <div class="datasets-grid" id="datasetsGrid">
+                    <div class="empty-state">
+                        <div class="empty-icon">📂</div>
+                        <p>暂无数据集</p>
+                        <p>创建您的第一个数据集开始标注之旅吧！</p>
+                        <button class="btn btn-primary" id="createFirstDatasetBtn">
+                            <span class="btn-icon">🚀</span>
+                            创建数据集
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button class="btn btn-secondary" id="prevPage" disabled>上一页</button>
+                    <span id="pageInfo">第 1 页，共 1 页</span>
+                    <button class="btn btn-secondary" id="nextPage" disabled>下一页</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 创建数据集模态框 -->
+    <div class="modal" id="createDatasetModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>创建新数据集</h3>
+                <button class="modal-close" id="closeCreateModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createDatasetForm">
+                    <div class="form-group">
+                        <label for="datasetName">数据集名称 *</label>
+                        <input type="text" id="datasetName" placeholder="输入数据集名称" required maxlength="100">
+                        <small class="form-hint">名称应该简洁明了，描述数据集的内容</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="datasetDescription">描述</label>
+                        <textarea id="datasetDescription" placeholder="描述您的数据集用途、来源等信息" rows="3" maxlength="500"></textarea>
+                        <small class="form-hint">可选，但建议填写以便更好地管理数据集</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox">
+                            <input type="checkbox" id="isPublic" checked>
+                            <span class="checkmark"></span>
+                            公开数据集
+                        </label>
+                        <small class="form-hint">公开的数据集可以被其他用户浏览</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelCreate">取消</button>
+                        <button type="submit" class="btn btn-primary">创建数据集</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入数据集模态框 -->
+    <div class="modal" id="importDatasetModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>导入数据集</h3>
+                <button class="modal-close" id="closeImportModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-options">
+                    <div class="import-option" data-type="zip">
+                        <div class="import-icon">📦</div>
+                        <h4>ZIP压缩包</h4>
+                        <p>上传包含图片的ZIP文件</p>
+                        <input type="file" id="zipFileInput" accept=".zip" style="display: none;">
+                    </div>
+                    <div class="import-option" data-type="folder">
+                        <div class="import-icon">📁</div>
+                        <h4>文件夹上传</h4>
+                        <p>选择包含图片的文件夹</p>
+                        <input type="file" id="folderInput" webkitdirectory multiple style="display: none;">
+                    </div>
+                    <div class="import-option" data-type="url">
+                        <div class="import-icon">🔗</div>
+                        <h4>URL导入</h4>
+                        <p>从网络URL导入数据集</p>
+                    </div>
+                </div>
+                <div class="import-form" id="importForm" style="display: none;">
+                    <div class="form-group">
+                        <label for="importDatasetName">数据集名称 *</label>
+                        <input type="text" id="importDatasetName" placeholder="输入数据集名称" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="importDescription">描述</label>
+                        <textarea id="importDescription" placeholder="描述导入的数据集" rows="2"></textarea>
+                    </div>
+                    <div class="import-progress" id="importProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="importProgressFill"></div>
+                        </div>
+                        <div class="progress-text" id="importProgressText">准备导入...</div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelImport">取消</button>
+                        <button type="button" class="btn btn-primary" id="startImport" disabled>开始导入</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据集详情模态框 -->
+    <div class="modal" id="datasetDetailModal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="datasetDetailTitle">数据集详情</h3>
+                <button class="modal-close" id="closeDetailModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="dataset-detail" id="datasetDetail">
+                    <!-- 数据集详情内容将在这里动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dataset.js"></script>
+</body>
+</html>

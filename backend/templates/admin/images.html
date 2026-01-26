@@ -1,0 +1,90 @@
+{% extends "admin/base.html" %}
+
+{% block title %}图片管理 - SeedAI 管理后台{% endblock %}
+
+{% block page_title %}图片管理{% endblock %}
+
+{% block content %}
+<div class="page-actions">
+    <button class="btn btn-primary" onclick="refreshImages()">刷新列表</button>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>文件名</th>
+            <th>数据集</th>
+            <th>上传者</th>
+            <th>文件大小</th>
+            <th>标签数量</th>
+            <th>上传时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for image in images %}
+        <tr>
+            <td>{{ image.id }}</td>
+            <td>{{ image.filename }}</td>
+            <td>{{ image.dataset_name or '未知' }}</td>
+            <td>{{ image.uploader_username or '未知' }}</td>
+            <td>{{ (image.file_size / 1024)|round(1) }} KB</td>
+            <td>{{ image.annotation_count or 0 }}</td>
+            <td>{{ image.created_at.strftime('%Y-%m-%d %H:%M') if image.created_at else '-' }}</td>
+            <td>
+                <button class="action-btn btn-outline" onclick="viewImage({{ image.id }})">查看</button>
+                <button class="action-btn btn-danger" onclick="deleteImage({{ image.id }})">删除</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not images %}
+<div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+    暂无图片数据
+</div>
+{% endif %}
+
+<script>
+async function refreshImages() {
+    window.location.reload();
+}
+
+async function viewImage(imageId) {
+    window.open(`/api/images/${imageId}`, '_blank');
+}
+
+async function deleteImage(imageId) {
+    if (!confirm('确定要删除这张图片吗？此操作不可撤销！')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/images/${imageId}/delete`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            }
+        });
+
+        if (response.ok) {
+            alert('图片已删除');
+            refreshImages();
+        } else {
+            alert('删除失败');
+        }
+    } catch (error) {
+        console.error('Delete image error:', error);
+        alert('删除失败，请重试');
+    }
+}
+</script>
+
+<style>
+.page-actions {
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}

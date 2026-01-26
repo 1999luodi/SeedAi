@@ -1,0 +1,97 @@
+{% extends "admin/base.html" %}
+
+{% block title %}用户管理 - SeedAI 管理后台{% endblock %}
+
+{% block page_title %}用户管理{% endblock %}
+
+{% block content %}
+<div class="page-actions">
+    <button class="btn btn-primary" onclick="refreshUsers()">刷新列表</button>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>用户名</th>
+            <th>邮箱</th>
+            <th>状态</th>
+            <th>注册时间</th>
+            <th>数据集数量</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.id }}</td>
+            <td>{{ user.username }}</td>
+            <td>{{ user.email }}</td>
+            <td>
+                <span class="status-badge status-{{ 'active' if user.is_active else 'inactive' }}">
+                    {{ '正常' if user.is_active else '禁用' }}
+                </span>
+            </td>
+            <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '-' }}</td>
+            <td>{{ user.dataset_count or 0 }}</td>
+            <td>
+                <button class="action-btn btn-outline" onclick="viewUser({{ user.id }})">查看</button>
+                <button class="action-btn {{ 'btn-danger' if user.is_active else 'btn-primary' }}"
+                        onclick="toggleUserStatus({{ user.id }}, {{ user.is_active|lower }})">
+                    {{ '禁用' if user.is_active else '启用' }}
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not users %}
+<div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+    暂无用户数据
+</div>
+{% endif %}
+
+<script>
+async function refreshUsers() {
+    window.location.reload();
+}
+
+async function viewUser(userId) {
+    // 这里可以打开用户详情模态框或跳转到详情页面
+    alert('用户详情功能待实现，用户ID: ' + userId);
+}
+
+async function toggleUserStatus(userId, currentStatus) {
+    if (!confirm(`确定要${currentStatus ? '禁用' : '启用'}这个用户吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/toggle-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            }
+        });
+
+        if (response.ok) {
+            alert('用户状态已更新');
+            refreshUsers();
+        } else {
+            alert('操作失败');
+        }
+    } catch (error) {
+        console.error('Toggle user status error:', error);
+        alert('操作失败，请重试');
+    }
+}
+</script>
+
+<style>
+.page-actions {
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}

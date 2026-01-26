@@ -1,0 +1,122 @@
+{% extends "admin/base.html" %}
+
+{% block title %}数据集管理 - SeedAI 管理后台{% endblock %}
+
+{% block page_title %}数据集管理{% endblock %}
+
+{% block content %}
+<div class="page-actions">
+    <button class="btn btn-primary" onclick="refreshDatasets()">刷新列表</button>
+</div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>名称</th>
+            <th>所有者</th>
+            <th>图片数量</th>
+            <th>状态</th>
+            <th>创建时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for dataset in datasets %}
+        <tr>
+            <td>{{ dataset.id }}</td>
+            <td>{{ dataset.name }}</td>
+            <td>{{ dataset.owner_username or '未知' }}</td>
+            <td>{{ dataset.image_count or 0 }}</td>
+            <td>
+                <span class="status-badge status-{{ 'active' if dataset.is_public else 'inactive' }}">
+                    {{ '公开' if dataset.is_public else '私有' }}
+                </span>
+            </td>
+            <td>{{ dataset.created_at.strftime('%Y-%m-%d %H:%M') if dataset.created_at else '-' }}</td>
+            <td>
+                <button class="action-btn btn-outline" onclick="viewDataset({{ dataset.id }})">查看</button>
+                <button class="action-btn {{ 'btn-danger' if dataset.is_public else 'btn-primary' }}"
+                        onclick="toggleDatasetPublic({{ dataset.id }}, {{ dataset.is_public|lower }})">
+                    {{ '设为私有' if dataset.is_public else '设为公开' }}
+                </button>
+                <button class="action-btn btn-danger" onclick="deleteDataset({{ dataset.id }})">删除</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if not datasets %}
+<div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+    暂无数据集
+</div>
+{% endif %}
+
+<script>
+async function refreshDatasets() {
+    window.location.reload();
+}
+
+async function viewDataset(datasetId) {
+    window.open(`/api/datasets/${datasetId}`, '_blank');
+}
+
+async function toggleDatasetPublic(datasetId, currentStatus) {
+    if (!confirm(`确定要${currentStatus ? '设为私有' : '设为公开'}这个数据集吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/datasets/${datasetId}/toggle-public`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            }
+        });
+
+        if (response.ok) {
+            alert('数据集状态已更新');
+            refreshDatasets();
+        } else {
+            alert('操作失败');
+        }
+    } catch (error) {
+        console.error('Toggle dataset public error:', error);
+        alert('操作失败，请重试');
+    }
+}
+
+async function deleteDataset(datasetId) {
+    if (!confirm('确定要删除这个数据集吗？此操作不可撤销！')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            }
+        });
+
+        if (response.ok) {
+            alert('数据集已删除');
+            refreshDatasets();
+        } else {
+            alert('删除失败');
+        }
+    } catch (error) {
+        console.error('Delete dataset error:', error);
+        alert('删除失败，请重试');
+    }
+}
+</script>
+
+<style>
+.page-actions {
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
