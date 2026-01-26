@@ -51,6 +51,15 @@ graph LR
 md图形化 插件 Markdown Preview Mermaid Support
 
 管理docker 插件 docker
+## 3.git ssh
+生成钥匙对，上传公钥
+测试ssh 连接通过后
+修改仓库远程地址
+```
+git remote -v
+
+git remote set-url origin git@github.com:1999luodi/SeedAi.git
+```
 
 # 后端架构完善
 
