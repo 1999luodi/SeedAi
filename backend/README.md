@@ -1,218 +1,325 @@
-# SeedAI 后端管理系统
+# SeedAI 后端服务
 
-## 概述
+SeedAI 是一个基于AI的图像标注与数据集管理平台的后端服务部分。
 
-SeedAI 后端管理系统是一个基于 Flask 的完整 Web 管理后台，为 AI 图像标注平台提供全面的管理功能。该系统完全独立于前端，提供了用户管理、数据集管理、图片管理、统计信息等核心管理功能。
+## 功能特性
 
-## 架构特点
+- 用户注册/登录与JWT认证
+- 数据集创建与管理
+- 图片上传与存储
+- AI模型推理支持（目标检测）
+- 完整的RBAC基础架构（基于JWT）
 
-- **完全后端实现** - 不依赖前端文件，完全在后端提供管理界面
-- **现代化设计** - 使用现代 Web 技术和响应式设计
-- **RESTful API** - 提供完整的 API 接口供前端或其他系统调用
-- **模块化设计** - 清晰的代码结构，易于维护和扩展
-- **安全可靠** - 包含权限验证、错误处理和数据验证
+## 系统架构
 
-## 技术栈
+后端采用Flask框架，配合MySQL数据库存储用户、数据集和图像信息。
 
-- **后端框架**: Flask 2.3+
-- **数据库**: MySQL 8.0
-- **ORM**: SQLAlchemy
-- **模板引擎**: Jinja2
-- **身份验证**: JWT (JSON Web Token)
-- **容器化**: Docker & Docker Compose
-- **前端技术**: 纯 HTML/CSS/JavaScript (管理后台)
-
-## 目录结构
+### 目录结构
 
 ```
 backend/
-├── app.py                 # Flask 应用主文件
-├── config.py             # 配置文件
-├── models.py             # 数据库模型
+├── app.py                # 主应用入口
+├── config.py             # 配置管理
+├── models.py             # ORM模型定义
 ├── utils.py              # 工具函数
-├── requirements.txt      # Python 依赖
-├── templates/            # Jinja2 模板
-│   └── admin/           # 管理后台模板
-│       ├── base.html    # 基础布局模板
-│       ├── dashboard.html   # 仪表板
-│       ├── users.html       # 用户管理
-│       ├── datasets.html    # 数据集管理
-│       ├── images.html      # 图片管理
-│       └── stats.html       # 统计信息
-├── services/            # 业务逻辑层
-│   ├── user_service.py      # 用户服务
-│   ├── dataset_service.py   # 数据集服务
-│   └── image_service.py     # 图片服务
-├── admin_test.html      # 管理后台测试页面
-└── ADMIN_README.md      # 管理后台使用说明
+├── services/             # 业务逻辑层
+│   ├── user_service.py   # 用户服务
+│   ├── dataset_service.py # 数据集服务
+│   └── image_service.py  # 图像服务
+├── templates/            # Flask模板
+│   └── login.html        # 登录页面
+├── api_endpoints.json    # API端点定义
+└── requirements.txt      # Python依赖
 ```
 
-## 管理后台功能
+## 容器化部署
 
-### 1. 仪表板 (`/admin`)
-- 系统统计概览（用户数、数据集数、图片数等）
-- 快速操作入口
-- 系统状态监控
-- 最近活动记录
+使用Docker容器部署，数据持久化通过Docker卷实现：
 
-### 2. 用户管理 (`/admin/users`)
-- 查看所有注册用户
-- 用户状态管理（启用/禁用）
-- 用户数据集统计
-- 用户注册时间等信息
+- MySQL数据持久化至 `./mysql_data/data`
+- 用户上传文件存储于 `./uploads`
+- 数据集文件存储于 `./datasets`
 
-### 3. 数据集管理 (`/admin/datasets`)
-- 查看所有数据集
-- 数据集公开状态切换
-- 数据集图片数量统计
-- 数据集创建时间和所有者信息
+**注意：** 容器重启不会丢失数据，因为数据已通过Docker卷映射到宿主机目录。但应用配置和安装的软件包会保留，除非重建镜像。
 
-### 4. 图片管理 (`/admin/images`)
-- 查看所有上传的图片
-- 图片删除功能
-- 图片元信息显示（文件名、大小、上传者等）
-- 标注状态统计
+## 系统入口
 
-### 5. 统计信息 (`/admin/stats`)
-- 详细的系统使用统计
-- 数据存储统计
-- 使用情况分析
-- 系统状态监控
+- **后端管理系统入口**：`http://localhost/backend/login`
+- **API测试页面**：`http://localhost/tests/api-test.html`
+
+## 默认账户
+
+- **超级管理员**：admin / 123456（角色为2）
+- **普通用户**：user1 / 123456（角色为0）
+
+## API接口
+
+所有API接口定义都从后端的[api_endpoints.json](file:///d:/ai-projects/SeedAi/backend/api_endpoints.json)文件动态加载，便于API测试页面和其他工具使用。
+
+## 技术栈
+
+- Python 3.9+
+- Flask 2.3.2
+- Flask-SQLAlchemy 3.1.1
+- PyMySQL 1.1.0
+- PyJWT 2.8.0
+- bcrypt 4.0.1
+- SQLAlchemy 2.0.23
+
+## 权限管理
+
+- 超级管理员 (role=2)：可访问所有管理功能，可修改所有用户数据
+- 普通管理员 (role=1)：仅可访问基础管理页面，仅可查看数据，无修改权限
+- 普通用户 (role=0)：仅拥有基本功能权限
+
 
 ## API 接口
 
-### 管理 API
+### 认证 API
 
-#### 用户管理
-```http
+#### 用户登录
+```bash
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username_or_email": "admin",
+  "password": "123456"
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@admin.com",
+      "created_at": "2026-03-07T11:32:25",
+      "role": 2
+    },
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+  }
+}
+```
+
+#### 后端管理系统登录（使用不同接口，需要管理权限）
+```bash
+POST /backend/login
+Content-Type: application/json
+
+{
+  "username_or_email": "admin",
+  "password": "123456"
+}
+```
+
+#### 用户注册
+```bash
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "password": "SecurePassword123"
+}
+```
+
+### 用户管理 API
+
+#### 获取当前用户信息
+```bash
+GET /api/users/profile
+Authorization: Bearer {token}
+```
+
+#### 查看用户信息
+```bash
+GET /api/users/{user_id}
+Authorization: Bearer {token}
+```
+
+#### 修改用户信息
+```bash
+PUT /api/users/{user_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "username": "updated_username",
+  "email": "updated@example.com"
+}
+```
+
+#### 用户退出
+```bash
+POST /api/auth/logout
+Authorization: Bearer {token}
+```
+
+### 数据集管理 API
+
+#### 创建数据集
+```bash
+POST /api/datasets
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "My Dataset",
+  "description": "A sample dataset for testing",
+  "category": "detection"
+}
+```
+
+#### 获取用户数据集列表
+```bash
+GET /api/datasets
+Authorization: Bearer {token}
+```
+
+#### 查看指定数据集
+```bash
+GET /api/datasets/{dataset_id}
+Authorization: Bearer {token}
+```
+
+#### 修改数据集
+```bash
+PUT /api/datasets/{dataset_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "Updated Dataset Name",
+  "description": "Updated description",
+  "category": "classification"
+}
+```
+
+#### 删除数据集
+```bash
+DELETE /api/datasets/{dataset_id}
+Authorization: Bearer {token}
+```
+
+### 图片管理 API
+
+#### 上传图片到数据集
+```bash
+POST /api/datasets/{dataset_id}/upload
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+```
+
+#### 查看指定图片
+```bash
+GET /api/images/{image_id}
+Authorization: Bearer {token}
+```
+
+#### 修改图片信息
+```bash
+PUT /api/images/{image_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "original_filename": "new_filename.jpg"
+}
+```
+
+#### 删除图片
+```bash
+DELETE /api/images/{image_id}
+Authorization: Bearer {token}
+```
+
+### 数据标注 API
+
+#### 查看图片标注
+```bash
+GET /api/images/{image_id}/annotations
+Authorization: Bearer {token}
+```
+
+#### 添加标注
+```bash
+POST /api/images/{image_id}/annotations
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "label": "person",
+  "x_min": 0.1,
+  "y_min": 0.2,
+  "x_max": 0.8,
+  "y_max": 0.9,
+  "confidence": 0.95
+}
+```
+
+#### 修改标注
+```bash
+PUT /api/annotations/{annotation_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "label": "updated_label",
+  "confidence": 0.98
+}
+```
+
+#### 删除标注
+```bash
+DELETE /api/annotations/{annotation_id}
+Authorization: Bearer {token}
+```
+
+### AI推理 API
+
+#### AI推理接口，接收图片返回标注结果
+```bash
+POST /api/ai/inference
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+
+image: <file>
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "message": "Inference completed",
+  "data": [
+    {
+      "label": "person",
+      "bbox": [100, 100, 200, 300],
+      "confidence": 0.95,
+      "class_id": 0
+    },
+    {
+      "label": "car",
+      "bbox": [300, 200, 500, 400],
+      "confidence": 0.89,
+      "class_id": 2
+    }
+  ]
+}
+```
+
+### 管理员 API
+
+#### 切换用户状态（管理员）
+```bash
 POST /api/admin/users/{user_id}/toggle-status
-```
-切换用户状态（启用/禁用）
-
-#### 数据集管理
-```http
-POST /api/admin/datasets/{dataset_id}/toggle-public
-```
-切换数据集公开状态
-
-#### 图片管理
-```http
-DELETE /api/admin/images/{image_id}/delete
-```
-删除指定图片
-
-### 数据 API
-
-#### 用户 API
-```http
-GET  /api/auth/register          # 用户注册
-POST /api/auth/login             # 用户登录
-GET  /api/users/profile          # 获取用户资料
-```
-
-#### 数据集 API
-```http
-POST /api/datasets               # 创建数据集
-GET  /api/datasets               # 获取用户数据集
-GET  /api/datasets/{id}          # 获取指定数据集
-GET  /api/datasets/{id}/images   # 获取数据集图片
-POST /api/datasets/{id}/upload   # 上传图片到数据集
-```
-
-#### 图片 API
-```http
-GET  /api/images/{id}            # 获取图片信息
-PUT  /api/images/{id}/annotations # 更新图片标注
-```
-
-#### 系统 API
-```http
-GET  /health                     # 健康检查
-GET  /api/datasets/public        # 获取公开数据集
-```
-
-## 安装和运行
-
-### 1. 环境要求
-- Python 3.9+
-- Docker & Docker Compose
-- MySQL 8.0
-
-### 2. 安装依赖
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-### 3. 配置环境
-编辑 `config.py` 文件，设置数据库连接等配置：
-```python
-class Config:
-    SECRET_KEY = 'your-secret-key'
-    SQLALCHEMY_DATABASE_URI = 'mysql://user:password@localhost/seedai'
-    JWT_SECRET_KEY = 'your-jwt-secret'
-    UPLOAD_FOLDER = '/app/uploads'
-    DATASETS_FOLDER = '/app/datasets'
-```
-
-### 4. 运行应用
-```bash
-# 使用 Docker Compose（推荐）
-docker-compose up -d
-
-# 或直接运行 Flask 应用
-python app.py
-```
-
-### 5. 访问管理后台
-- 管理后台首页: `http://localhost:5000/admin`
-- 用户管理: `http://localhost:5000/admin/users`
-- 数据集管理: `http://localhost:5000/admin/datasets`
-- 图片管理: `http://localhost:5000/admin/images`
-- 统计信息: `http://localhost:5000/admin/stats`
-- 系统测试: `http://localhost:5000/admin_test.html`
-
-## 数据库模型
-
-### User（用户表）
-```sql
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(80) UNIQUE NOT NULL,
-    email VARCHAR(120) UNIQUE NOT NULL,
-    password_hash VARCHAR(128) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE
-);
-```
-
-### Dataset（数据集表）
-```sql
-CREATE TABLE datasets (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_by INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_public BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
-```
-
-### Image（图片表）
-```sql
-CREATE TABLE images (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    filename VARCHAR(255) NOT NULL,
-    original_filename VARCHAR(255) NOT NULL,
-    dataset_id INTEGER NOT NULL,
-    uploaded_by INTEGER NOT NULL,
-    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    file_path VARCHAR(500) NOT NULL,
-    annotations JSON DEFAULT ('[]'),
-    FOREIGN KEY (dataset_id) REFERENCES datasets(id),
-    FOREIGN KEY (uploaded_by) REFERENCES users(id)
-);
+Authorization: Bearer {token}
 ```
 
 ## 安全特性
@@ -223,7 +330,7 @@ CREATE TABLE images (
 - 会话管理
 
 ### 2. 权限控制
-- 用户角色管理（预留扩展）
+- 用户角色管理
 - API 访问控制
 - 文件上传安全检查
 
@@ -232,20 +339,32 @@ CREATE TABLE images (
 - SQL 注入防护
 - XSS 防护
 
-## 扩展开发
+## 部署说明
 
-### 添加新的管理页面
-1. 在 `templates/admin/` 目录下创建新的 HTML 模板
-2. 在 `app.py` 中添加对应的路由
-3. 在 `services/` 中实现相应的业务逻辑
+### Docker 部署
+项目已配置完整的 Docker 环境：
+```bash
+# 构建和启动
+docker-compose up -d
 
-### 添加新的 API 接口
-1. 在相应的 service 类中实现业务方法
-2. 在 `app.py` 中添加路由和处理逻辑
-3. 更新 API 文档
+# 查看服务状态
+docker-compose ps
 
-### 自定义样式
-管理后台使用 CSS 变量，可以通过修改 `templates/admin/base.html` 中的 CSS 来自定义样式。
+# 查看日志
+docker-compose logs backend
+```
+
+### 手动部署
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 初始化数据库
+python db_init.py
+
+# 启动应用
+python app.py
+```
 
 ## 故障排除
 
@@ -275,63 +394,17 @@ docker logs seedai-backend-1
 docker logs seedai-mysql-1
 ```
 
-## 性能优化
+## 扩展开发
 
-### 1. 数据库优化
-- 添加适当的索引
-- 优化查询语句
-- 使用连接池
+### 添加新的管理页面
+1. 在 `templates/admin/` 目录下创建新的 HTML 模板
+2. 在 `app.py` 中添加对应的路由
+3. 在 `services/` 中实现相应的业务逻辑
 
-### 2. 缓存策略
-- 实现 Redis 缓存
-- 静态文件缓存
-- API 响应缓存
+### 添加新的 API 接口
+1. 在相应的 service 类中实现业务方法
+2. 在 `app.py` 中添加路由和处理逻辑
+3. 更新 API 文档
 
-### 3. 文件存储
-- 使用云存储服务
-- 实现文件分片上传
-- 添加文件压缩
-
-## 部署说明
-
-### 生产环境部署
-1. 使用 Gunicorn 或 uWSGI 作为 WSGI 服务器
-2. 配置 Nginx 反向代理
-3. 设置 HTTPS 证书
-4. 配置日志轮转
-5. 设置监控和告警
-
-### Docker 部署
-项目已配置完整的 Docker 环境：
-```bash
-# 构建和启动
-docker-compose up --build -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f backend
-```
-
-## 贡献指南
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-## 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 联系方式
-
-- 项目主页: [https://github.com/your-username/seedai](https://github.com/your-username/seedai)
-- 问题反馈: [https://github.com/your-username/seedai/issues](https://github.com/your-username/seedai/issues)
-- 邮箱: your-email@example.com
-
----
-
-**最后更新**: 2024年1月26日
+### 自定义样式
+管理后台使用 CSS 变量，可以通过修改 `templates/admin/base.html` 中的 CSS 来自定义样式。

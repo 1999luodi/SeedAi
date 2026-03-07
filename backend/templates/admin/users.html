@@ -6,7 +6,8 @@
 
 {% block content %}
 <div class="page-actions">
-    <button class="btn btn-primary" onclick="refreshUsers()">刷新列表</button>
+    <button class="btn btn-primary" onclick="showAddUserModal()">➕ 新增用户</button>
+    <button class="btn btn-outline" onclick="refreshUsers()">🔄 刷新列表</button>
 </div>
 
 <table class="data-table">
@@ -23,23 +24,25 @@
     </thead>
     <tbody>
         {% for user in users %}
-        <tr>
+        <tr id="user-row-{{ user.id }}">
             <td>{{ user.id }}</td>
             <td>{{ user.username }}</td>
             <td>{{ user.email }}</td>
             <td>
                 <span class="status-badge status-{{ 'active' if user.is_active else 'inactive' }}">
-                    {{ '正常' if user.is_active else '禁用' }}
+                    {{ '✅ 正常' if user.is_active else '❌ 禁用' }}
                 </span>
             </td>
             <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '-' }}</td>
             <td>{{ user.dataset_count or 0 }}</td>
             <td>
-                <button class="action-btn btn-outline" onclick="viewUser({{ user.id }})">查看</button>
-                <button class="action-btn {{ 'btn-danger' if user.is_active else 'btn-primary' }}"
+                <button class="action-btn btn-small btn-info" onclick="showCredentialsModal({{ user.id }}, '{{ user.username }}', '{{ user.email }}')">👁️ 凭证</button>
+                <button class="action-btn btn-small btn-outline" onclick="showEditUserModal({{ user.id }}, '{{ user.username }}', '{{ user.email }}', {{ user.is_active|lower }})">✏️ 编辑</button>
+                <button class="action-btn btn-small {{ 'btn-warning' if user.is_active else 'btn-primary' }}"
                         onclick="toggleUserStatus({{ user.id }}, {{ user.is_active|lower }})">
-                    {{ '禁用' if user.is_active else '启用' }}
+                    {{ '⛔ 禁用' if user.is_active else '✅ 启用' }}
                 </button>
+                <button class="action-btn btn-small btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">🗑️ 删除</button>
             </td>
         </tr>
         {% endfor %}
@@ -52,16 +55,322 @@
 </div>
 {% endif %}
 
+<!-- 新增/编辑用户模态框 -->
+<div id="userModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">新增用户</h2>
+            <button class="close-btn" onclick="closeUserModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="username">用户名 <span class="required">*</span></label>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
+                    <small id="usernameError" style="color: red; display: none;"></small>
+                </div>
+                <div class="form-group">
+                    <label for="email">邮箱 <span class="required">*</span></label>
+                    <input type="email" id="email" name="email" required placeholder="请输入邮箱地址">
+                    <small id="emailError" style="color: red; display: none;"></small>
+                </div>
+                <div class="form-group" id="passwordGroup">
+                    <label for="password">密码 <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" placeholder="请输入密码（至少6位）">
+                    <small id="passwordError" style="color: red; display: none;"></small>
+                </div>
+                <div class="form-group">
+                    <label for="isActive">
+                        <input type="checkbox" id="isActive" name="is_active" checked>
+                        用户状态：启用
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeUserModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveUser()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认模态框 -->
+<div id="deleteModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>删除用户</h2>
+            <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="deleteMessage"></p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" onclick="confirmDelete()">确认删除</button>
+        </div>
+    </div>
+</div>
+
+<!-- 查看凭证模态框 -->
+<div id="credentialsModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>👁️ 用户凭证</h2>
+            <button class="close-btn" onclick="closeCredentialsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="credentials-info">
+                <div class="credential-item">
+                    <label>账号（用户名）</label>
+                    <div class="credential-value" id="credUsername"></div>
+                    <button class="copy-btn" onclick="copyToClipboard('credUsername')">📋 复制</button>
+                </div>
+                
+                <div class="credential-item">
+                    <label>邮箱</label>
+                    <div class="credential-value" id="credEmail"></div>
+                    <button class="copy-btn" onclick="copyToClipboard('credEmail')">📋 复制</button>
+                </div>
+                
+                <div class="credential-item" style="background-color: var(--warning-bg, rgba(245, 158, 11, 0.1)); padding: 1rem; border-radius: 4px; border: 1px solid var(--warning-color, #f59e0b);">
+                    <label style="color: var(--warning-color, #f59e0b);">⚠️ 密码说明</label>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: var(--text-secondary);">
+                        密码使用加密算法存储，以确保安全性。原始密码无法查看或恢复。<br />
+                        如需修改密码，请点击"编辑"按钮或使用下方的"重置密码"功能。
+                    </p>
+                </div>
+                
+                <div class="credential-item">
+                    <label>快速操作</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-small btn-primary" onclick="showResetPasswordModal()" style="color: black;">🔑 重置密码</button>
+                        <button class="btn btn-small btn-outline" onclick="closeCredentialsModal()">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 重置密码模态框 -->
+<div id="resetPasswordModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>🔑 重置密码</h2>
+            <button class="close-btn" onclick="closeResetPasswordModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="resetPasswordForm">
+                <div class="form-group">
+                    <label for="newPassword">新密码 <span class="required">*</span></label>
+                    <input type="password" id="newPassword" name="newPassword" required placeholder="至少 6 位" minlength="6">
+                    <small id="newPasswordError" style="color: red; display: none;"></small>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">确认密码 <span class="required">*</span></label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="确认新密码" minlength="6">
+                    <small id="confirmPasswordError" style="color: red; display: none;"></small>
+                </div>
+                <div style="background-color: rgba(59, 130, 246, 0.1); padding: 0.75rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary);">
+                    💡 新密码必须至少 6 位，请牢记新密码。
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeResetPasswordModal()">取消</button>
+            <button class="btn btn-primary" onclick="confirmResetPassword()">确认重置</button>
+        </div>
+    </div>
+</div>
+
 <script>
+let currentEditingUserId = null;
+let currentDeleteUserId = null;
+
+// 显示新增用户模态框
+function showAddUserModal() {
+    currentEditingUserId = null;
+    document.getElementById('modalTitle').textContent = '新增用户';
+    document.getElementById('userForm').reset();
+    document.getElementById('passwordGroup').style.display = 'block';
+    document.getElementById('password').required = true;
+    document.getElementById('isActive').checked = true;
+    
+    // 清除错误提示
+    document.getElementById('usernameError').style.display = 'none';
+    document.getElementById('emailError').style.display = 'none';
+    document.getElementById('passwordError').style.display = 'none';
+    
+    document.getElementById('userModal').style.display = 'block';
+}
+
+// 显示编辑用户模态框
+function showEditUserModal(userId, username, email, isActive) {
+    currentEditingUserId = userId;
+    document.getElementById('modalTitle').textContent = '编辑用户';
+    document.getElementById('username').value = username;
+    document.getElementById('email').value = email;
+    document.getElementById('isActive').checked = isActive;
+    document.getElementById('password').value = '';
+    document.getElementById('passwordGroup').style.display = 'none';
+    document.getElementById('password').required = false;
+    
+    // 清除错误提示
+    document.getElementById('usernameError').style.display = 'none';
+    document.getElementById('emailError').style.display = 'none';
+    document.getElementById('passwordError').style.display = 'none';
+    
+    document.getElementById('userModal').style.display = 'block';
+}
+
+// 关闭用户模态框
+function closeUserModal() {
+    document.getElementById('userModal').style.display = 'none';
+    currentEditingUserId = null;
+}
+
+// 保存用户
+async function saveUser() {
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const isActive = document.getElementById('isActive').checked;
+    
+    // 验证
+    let hasError = false;
+    
+    if (!username) {
+        document.getElementById('usernameError').textContent = '用户名不能为空';
+        document.getElementById('usernameError').style.display = 'block';
+        hasError = true;
+    } else {
+        document.getElementById('usernameError').style.display = 'none';
+    }
+    
+    if (!email) {
+        document.getElementById('emailError').textContent = '邮箱不能为空';
+        document.getElementById('emailError').style.display = 'block';
+        hasError = true;
+    } else if (!email.includes('@')) {
+        document.getElementById('emailError').textContent = '邮箱格式不正确';
+        document.getElementById('emailError').style.display = 'block';
+        hasError = true;
+    } else {
+        document.getElementById('emailError').style.display = 'none';
+    }
+    
+    if (!currentEditingUserId && !password) {
+        document.getElementById('passwordError').textContent = '密码不能为空';
+        document.getElementById('passwordError').style.display = 'block';
+        hasError = true;
+    } else if (password && password.length < 6) {
+        document.getElementById('passwordError').textContent = '密码至少6位';
+        document.getElementById('passwordError').style.display = 'block';
+        hasError = true;
+    } else {
+        document.getElementById('passwordError').style.display = 'none';
+    }
+    
+    if (hasError) return;
+    
+    try {
+        if (currentEditingUserId) {
+            // 编辑用户
+            const data = { email, is_active: isActive };
+            if (password) data.password = password;
+            
+            const response = await fetch(`/api/admin/users/${currentEditingUserId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                alert('用户信息已更新');
+                closeUserModal();
+                refreshUsers();
+            } else {
+                const result = await response.json();
+                alert('操作失败: ' + (result.message || '未知错误'));
+            }
+        } else {
+            // 新增用户 - 调用注册 API
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password
+                })
+            });
+            
+            if (response.ok) {
+                alert('用户创建成功');
+                closeUserModal();
+                refreshUsers();
+            } else {
+                const result = await response.json();
+                alert('创建失败: ' + (result.message || '未知错误'));
+            }
+        }
+    } catch (error) {
+        console.error('Save user error:', error);
+        alert('操作失败，请重试');
+    }
+}
+
+// 显示删除确认模态框
+function deleteUser(userId, username) {
+    currentDeleteUserId = userId;
+    document.getElementById('deleteMessage').textContent = `确定要删除用户 "${username}" 吗？此操作不可撤销！`;
+    document.getElementById('deleteModal').style.display = 'block';
+}
+
+// 关闭删除模态框
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+    currentDeleteUserId = null;
+}
+
+// 确认删除
+async function confirmDelete() {
+    if (!currentDeleteUserId) return;
+    
+    try {
+        const response = await fetch(`/api/admin/users/${currentDeleteUserId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            }
+        });
+        
+        if (response.ok) {
+            alert('用户删除成功');
+            closeDeleteModal();
+            refreshUsers();
+        } else {
+            const result = await response.json();
+            alert('删除失败: ' + (result.message || '未知错误'));
+        }
+    } catch (error) {
+        console.error('Delete user error:', error);
+        alert('删除失败，请重试');
+    }
+}
+
+// 刷新列表
 async function refreshUsers() {
     window.location.reload();
 }
 
-async function viewUser(userId) {
-    // 这里可以打开用户详情模态框或跳转到详情页面
-    alert('用户详情功能待实现，用户ID: ' + userId);
-}
-
+// 切换用户状态
 async function toggleUserStatus(userId, currentStatus) {
     if (!confirm(`确定要${currentStatus ? '禁用' : '启用'}这个用户吗？`)) {
         return;
@@ -87,11 +396,327 @@ async function toggleUserStatus(userId, currentStatus) {
         alert('操作失败，请重试');
     }
 }
+
+// 显示凭证模态框
+function showCredentialsModal(userId, username, email) {
+    document.getElementById('credUsername').textContent = username;
+    document.getElementById('credEmail').textContent = email;
+    document.getElementById('credentialsModal').style.display = 'block';
+    currentEditingUserId = userId;
+}
+
+// 关闭凭证模态框
+function closeCredentialsModal() {
+    document.getElementById('credentialsModal').style.display = 'none';
+    currentEditingUserId = null;
+}
+
+// 复制到剪贴板
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    const text = element.textContent;
+    
+    // 使用新的 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✅ 已复制';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }).catch(err => {
+            alert('复制失败，请手动复制');
+            console.error('Copy error:', err);
+        });
+    } else {
+        // 兼容旧浏览器
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✅ 已复制';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }
+}
+
+// 显示重置密码模态框
+function showResetPasswordModal() {
+    document.getElementById('resetPasswordForm').reset();
+    document.getElementById('newPasswordError').style.display = 'none';
+    document.getElementById('confirmPasswordError').style.display = 'none';
+    document.getElementById('resetPasswordModal').style.display = 'block';
+}
+
+// 关闭重置密码模态框
+function closeResetPasswordModal() {
+    document.getElementById('resetPasswordModal').style.display = 'none';
+}
+
+// 确认重置密码
+async function confirmResetPassword() {
+    const newPassword = document.getElementById('newPassword').value.trim();
+    const confirmPassword = document.getElementById('confirmPassword').value.trim();
+    
+    let hasError = false;
+    
+    if (!newPassword || newPassword.length < 6) {
+        document.getElementById('newPasswordError').textContent = '密码至少6位';
+        document.getElementById('newPasswordError').style.display = 'block';
+        hasError = true;
+    } else {
+        document.getElementById('newPasswordError').style.display = 'none';
+    }
+    
+    if (newPassword !== confirmPassword) {
+        document.getElementById('confirmPasswordError').textContent = '两次输入的密码不一致';
+        document.getElementById('confirmPasswordError').style.display = 'block';
+        hasError = true;
+    } else {
+        document.getElementById('confirmPasswordError').style.display = 'none';
+    }
+    
+    if (hasError) return;
+    
+    if (!currentEditingUserId) {
+        alert('用户ID丢失，请重新操作');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/users/${currentEditingUserId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+            },
+            body: JSON.stringify({
+                password: newPassword
+            })
+        });
+        
+        if (response.ok) {
+            alert('密码已重置成功');
+            closeResetPasswordModal();
+            closeCredentialsModal();
+            refreshUsers();
+        } else {
+            const result = await response.json();
+            alert('重置失败: ' + (result.message || '未知错误'));
+        }
+    } catch (error) {
+        console.error('Reset password error:', error);
+        alert('重置失败，请重试');
+    }
+}
+
+// 点击模态框外部关闭
+window.onclick = function(event) {
+    const userModal = document.getElementById('userModal');
+    const deleteModal = document.getElementById('deleteModal');
+    const credentialsModal = document.getElementById('credentialsModal');
+    const resetPasswordModal = document.getElementById('resetPasswordModal');
+    
+    if (event.target == userModal) {
+        closeUserModal();
+    }
+    if (event.target == deleteModal) {
+        closeDeleteModal();
+    }
+    if (event.target == credentialsModal) {
+        closeCredentialsModal();
+    }
+    if (event.target == resetPasswordModal) {
+        closeResetPasswordModal();
+    }
+}
 </script>
 
 <style>
 .page-actions {
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-content {
+    background-color: #ffffff;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    border: 1px solid var(--border-color);
+}
+
+.modal-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #ffffff;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    background-color: #ffffff;
+}
+
+.modal-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    background-color: #ffffff;
+}
+
+.form-group {
     margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    background-color: #ffffff;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="password"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.required {
+    color: var(--error-color);
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.btn-warning {
+    background-color: var(--warning-color, #f59e0b);
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: var(--warning-hover, #d97706);
+}
+
+.btn-info {
+    background-color: var(--info-color, #3b82f6);
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: var(--info-hover, #2563eb);
+}
+
+.credentials-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.credential-item {
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.credential-item label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.credential-value {
+    background: #f5f5f5;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+    user-select: all;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.copy-btn {
+    padding: 0.4rem 0.8rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+    background-color: var(--primary-hover, #2563eb);
 }
 </style>
 {% endblock %}

@@ -1,0 +1,14 @@
+{
+  "test_datasets": [
+    {
+      "name": "Sample Dataset 1",
+      "description": "A sample dataset for testing purposes",
+      "is_public": false
+    },
+    {
+      "name": "Public Dataset",
+      "description": "A public dataset for testing",
+      "is_public": true
+    }
+  ]
+}

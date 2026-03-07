@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeedAI - API测试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 40px);
+            gap: 20px;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .request-panel, .response-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .request-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .btn-send {
+            background: #2196F3;
+        }
+
+        .btn-send:hover {
+            background: #1976D2;
+        }
+
+        .response-output {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f8f8;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .menu-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .menu-item:hover {
+            background: #f0f0f0;
+        }
+
+        .menu-item.active {
+            background: #e3f2fd;
+            font-weight: bold;
+        }
+
+        .endpoint-item {
+            padding: 8px 15px 8px 25px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 0.9em;
+        }
+
+        .endpoint-item:hover {
+            background: #f5f5f5;
+        }
+
+        .method-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: white;
+            font-size: 0.8em;
+            margin-right: 8px;
+        }
+
+        .GET { background: #2196F3; }
+        .POST { background: #4CAF50; }
+        .PUT { background: #FF9800; }
+        .DELETE { background: #F44336; }
+
+        .preset-section {
+            padding: 8px 15px 8px 25px;
+            border-bottom: 1px solid #f0f0f0;
+            font-weight: bold;
+            background: #fafafa;
+        }
+
+        .collapsible {
+            cursor: pointer;
+        }
+
+        .submenu {
+            padding-left: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>API 测试工具</h2>
+            <div id="menu-container">
+                <!-- 菜单将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="request-panel">
+                <div class="panel-title">API 请求</div>
+                <div class="request-form">
+                    <div class="form-group">
+                        <label for="preset-select">选择预设接口</label>
+                        <select id="preset-select" onchange="loadPreset()">
+                            <option value="">请选择...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-method">方法</label>
+                        <select id="api-method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-url">URL</label>
+                        <input type="text" id="api-url" placeholder="输入API端点URL">
+                    </div>
+                    <div class="form-group">
+                        <label for="request-body">请求体 (JSON)</label>
+                        <textarea id="request-body" rows="6" placeholder='输入JSON格式的请求体，例如: {"key": "value"}'></textarea>
+                    </div>
+                    <button class="btn-send" onclick="sendRequest()">发送请求</button>
+                </div>
+            </div>
+
+            <div class="response-panel">
+                <div class="panel-title">API 响应</div>
+                <div class="response-output" id="response-output">响应将显示在这里...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let endpointsData = null;
+        
+        // 页面加载完成后获取API端点定义
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/backend/api_endpoints.json');
+                endpointsData = await response.json();
+                
+                // 构建菜单
+                buildMenu();
+                
+                // 填充预设选择框
+                populatePresets();
+            } catch (error) {
+                console.error('获取API端点定义失败:', error);
+                document.getElementById('response-output').textContent = '获取API端点定义失败: ' + error.message;
+            }
+        });
+        
+        // 构建左侧菜单
+        function buildMenu() {
+            const menuContainer = document.getElementById('menu-container');
+            menuContainer.innerHTML = '';
+            
+            endpointsData.categories.forEach(category => {
+                // 创建类别标题
+                const categoryHeader = document.createElement('div');
+                categoryHeader.className = 'menu-item collapsible';
+                categoryHeader.innerHTML = `${category.icon} ${category.name}`;
+                categoryHeader.onclick = () => toggleSubmenu(categoryHeader.nextElementSibling);
+                
+                menuContainer.appendChild(categoryHeader);
+                
+                // 创建子菜单
+                const submenu = document.createElement('div');
+                submenu.className = 'submenu';
+                
+                category.endpoints.forEach(endpoint => {
+                    const endpointItem = document.createElement('div');
+                    endpointItem.className = 'endpoint-item';
+                    endpointItem.innerHTML = `
+                        <span class="method-tag ${endpoint.method}">${endpoint.method}</span>
+                        ${endpoint.name}
+                    `;
+                    endpointItem.onclick = () => loadEndpointDetails(endpoint);
+                    submenu.appendChild(endpointItem);
+                });
+                
+                menuContainer.appendChild(submenu);
+            });
+        }
+        
+        // 切换子菜单显示/隐藏
+        function toggleSubmenu(submenu) {
+            submenu.classList.toggle('hidden');
+        }
+        
+        // 填充预设选择框
+        function populatePresets() {
+            const presetSelect = document.getElementById('preset-select');
+            
+            endpointsData.categories.forEach(category => {
+                const group = document.createElement('optgroup');
+                group.label = category.name;
+                
+                category.endpoints.forEach(endpoint => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(endpoint);
+                    option.textContent = `${endpoint.name} (${endpoint.method} ${endpoint.endpoint})`;
+                    group.appendChild(option);
+                });
+                
+                presetSelect.appendChild(group);
+            });
+        }
+        
+        // 加载预设
+        function loadPreset() {
+            const presetSelect = document.getElementById('preset-select');
+            const selectedValue = presetSelect.value;
+            
+            if (!selectedValue) return;
+            
+            const endpoint = JSON.parse(selectedValue);
+            loadEndpointDetails(endpoint);
+        }
+        
+        // 加载端点详细信息到表单
+        function loadEndpointDetails(endpoint) {
+            document.getElementById('api-method').value = endpoint.method;
+            document.getElementById('api-url').value = window.location.origin + endpoint.endpoint;
+            
+            if (endpoint.example && Object.keys(endpoint.example).length > 0) {
+                document.getElementById('request-body').value = JSON.stringify(endpoint.example, null, 2);
+            } else {
+                document.getElementById('request-body').value = '';
+            }
+        }
+        
+        // 发送API请求
+        async function sendRequest() {
+            const method = document.getElementById('api-method').value;
+            const url = document.getElementById('api-url').value;
+            const requestBody = document.getElementById('request-body').value.trim();
+            
+            let body = null;
+            if (method !== 'GET' && requestBody) {
+                try {
+                    body = JSON.parse(requestBody);
+                } catch (e) {
+                    alert('请求体JSON格式错误: ' + e.message);
+                    return;
+                }
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: body ? JSON.stringify(body) : undefined
+                });
+                
+                const responseBody = await response.text();
+                
+                // 格式化响应内容
+                let formattedResponse;
+                try {
+                    const jsonRes = JSON.parse(responseBody);
+                    formattedResponse = JSON.stringify(jsonRes, null, 2);
+                } catch (e) {
+                    formattedResponse = responseBody;
+                }
+                
+                document.getElementById('response-output').textContent = 
+                    `状态码: ${response.status}\n${response.headers.get('Content-Type')?.includes('application/json') ? 'Content-Type: application/json\n' : ''}\n${formattedResponse}`;
+            } catch (error) {
+                document.getElementById('response-output').textContent = '请求失败: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

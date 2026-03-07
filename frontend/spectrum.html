@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光谱分析 - SeedAI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🌱 SeedAI</h1>
+                    <span class="subtitle">AI图像标注平台</span>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="index.html">首页</a></li>
+                        <li><a href="spectrum.html" class="active">光谱分析</a></li>
+                        <li><a href="detection.html">AI检测</a></li>
+                        <li><a href="dataset.html">数据集</a></li>
+                        <li><a href="annotate.html">手工标注</a></li>
+                        <li><a href="javascript:void(0)" id="profileLink" style="display:none;">
+                            <span id="usernameDisplay"></span>
+                            <span id="logoutLink" style="cursor:pointer;margin-left:10px;">退出</span>
+                        </a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="page-header">
+                <h1>🔬 光谱分析</h1>
+                <p>分析种子光谱特征，评估种子活力和品质</p>
+            </div>
+
+            <div class="spectrum-controls">
+                <div class="control-group">
+                    <label for="spectrumDatasetSelect">选择数据集:</label>
+                    <select id="spectrumDatasetSelect">
+                        <option value="">-- 请选择数据集 --</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="spectrumImageSelect">选择图片:</label>
+                    <select id="spectrumImageSelect">
+                        <option value="">-- 请先选择数据集 --</option>
+                    </select>
+                </div>
+                
+                <button id="analyzeBtn" class="btn btn-primary" disabled>
+                    <span class="btn-icon">📊</span>
+                    开始分析
+                </button>
+            </div>
+
+            <div class="spectrum-workspace">
+                <!-- 分析参数设置 -->
+                <div class="analysis-params">
+                    <h3>分析参数</h3>
+                    <div class="param-group">
+                        <div class="param-item">
+                            <label for="wavelengthStart">起始波长 (nm):</label>
+                            <input type="number" id="wavelengthStart" value="400" min="300" max="1100">
+                        </div>
+                        <div class="param-item">
+                            <label for="wavelengthEnd">结束波长 (nm):</label>
+                            <input type="number" id="wavelengthEnd" value="1000" min="300" max="1100">
+                        </div>
+                        <div class="param-item">
+                            <label for="resolution">分辨率 (nm):</label>
+                            <input type="number" id="resolution" value="10" min="1" max="100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 结果展示 -->
+                <div class="analysis-results">
+                    <div class="result-tabs">
+                        <button class="tab-btn active" data-tab="chart">图表</button>
+                        <button class="tab-btn" data-tab="data">数据</button>
+                        <button class="tab-btn" data-tab="report">报告</button>
+                    </div>
+
+                    <div class="tab-content">
+                        <div id="chartTab" class="tab-pane active">
+                            <div class="chart-container">
+                                <canvas id="spectrumChart"></canvas>
+                            </div>
+                        </div>
+                        <div id="dataTab" class="tab-pane">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>波长 (nm)</th>
+                                        <th>反射率 (%)</th>
+                                        <th>吸收率 (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataTableBody">
+                                    <!-- 数据行将动态插入 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="reportTab" class="tab-pane">
+                            <div class="report-content">
+                                <h4>分析报告</h4>
+                                <div id="analysisReport">
+                                    <p>选择图片并开始分析以查看报告</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 检查用户登录状态
+        function checkLoginStatus() {
+            const token = localStorage.getItem('token');
+            return !!token;
+        }
+
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = 'index.html';
+        }
+
+        // 初始化页面时检查登录状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const isLoggedIn = checkLoginStatus();
+            const loginLink = document.getElementById('loginLink');
+            const profileLink = document.getElementById('profileLink');
+            const logoutLink = document.getElementById('logoutLink');
+            const usernameDisplay = document.getElementById('usernameDisplay');
+            
+            if (isLoggedIn) {
+                // 用户已登录，显示用户名和退出链接
+                loginLink.style.display = 'none';
+                profileLink.style.display = 'block';
+                
+                // 获取用户信息并显示用户名
+                fetch('/api/users/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        usernameDisplay.textContent = data.data.username;
+                    }
+                })
+                .catch(err => console.error('获取用户信息失败:', err));
+                
+                // 为退出登录链接添加事件监听器
+                if (logoutLink) {
+                    logoutLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        logout();
+                    });
+                }
+            } else {
+                // 用户未登录，跳转到登录页面
+                // 注意：这里我们不再强制跳转，而是显示登录链接
+                loginLink.style.display = 'block';
+                profileLink.style.display = 'none';
+            }
+            
+            // 初始化页面组件
+            initializeSpectrumAnalyzer();
+        });
+
+        function initializeSpectrumAnalyzer() {
+            // 光谱分析类
+            class SpectrumAnalyzer {
+                constructor() {
+                    this.datasets = [];
+                    this.images = [];
+                    this.chart = null;
+                    this.spectrumData = null;
+                    
+                    this.initElements();
+                    this.bindEvents();
+                    this.loadData();
+                }
+
+                initElements() {
+                    this.datasetSelect = document.getElementById('spectrumDatasetSelect');
+                    this.imageSelect = document.getElementById('spectrumImageSelect');
+                    this.analyzeBtn = document.getElementById('analyzeBtn');
+                    this.startWavelength = document.getElementById('wavelengthStart');
+                    this.endWavelength = document.getElementById('wavelengthEnd');
+                    this.resolution = document.getElementById('resolution');
+                    this.dataTableBody = document.getElementById('dataTableBody');
+                    this.analysisReport = document.getElementById('analysisReport');
+                    this.tabBtns = document.querySelectorAll('.tab-btn');
+                    this.tabPanes = document.querySelectorAll('.tab-pane');
+                }
+
+                bindEvents() {
+                    this.datasetSelect.addEventListener('change', (e) => this.onDatasetChange(e));
+                    this.imageSelect.addEventListener('change', (e) => this.onImageChange(e));
+                    this.analyzeBtn.addEventListener('click', () => this.performAnalysis());
+                    
+                    // 绑定标签切换事件
+                    this.tabBtns.forEach(btn => {
+                        btn.addEventListener('click', (e) => this.switchTab(e));
+                    });
+                }
+
+                async loadData() {
+                    try {
+                        const token = localStorage.getItem('token');
+                        if (!token) {
+                            window.location.href = 'login.html';
+                            return;
+                        }
+                        
+                        const response = await fetch('/api/datasets', {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.datasets = data.data || [];
+                            this.renderDatasets();
+                        } else {
+                            console.error('获取数据集失败:', response.status);
+                        }
+                    } catch (error) {
+                        console.error('加载数据失败:', error);
+                    }
+                }
+
+                renderDatasets() {
+                    this.datasetSelect.innerHTML = '<option value="">-- 请选择数据集 --</option>';
+                    this.datasets.forEach(dataset => {
+                        const option = document.createElement('option');
+                        option.value = dataset.id;
+                        option.textContent = dataset.name;
+                        this.datasetSelect.appendChild(option);
+                    });
+                }
+
+                async onDatasetChange(event) {
+                    const datasetId = event.target.value;
+                    if (!datasetId) {
+                        this.imageSelect.innerHTML = '<option value="">-- 请先选择数据集 --</option>';
+                        this.analyzeBtn.disabled = true;
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`/api/datasets/${datasetId}/images`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.images = data.data || [];
+                            this.renderImages();
+                            this.analyzeBtn.disabled = false;
+                        }
+                    } catch (error) {
+                        console.error('加载图片失败:', error);
+                    }
+                }
+
+                renderImages() {
+                    this.imageSelect.innerHTML = '<option value="">-- 请选择图片 --</option>';
+                    this.images.forEach(image => {
+                        const option = document.createElement('option');
+                        option.value = image.id;
+                        option.textContent = image.filename;
+                        this.imageSelect.appendChild(option);
+                    });
+                }
+
+                async onImageChange(event) {
+                    const imageId = event.target.value;
+                    if (!imageId) {
+                        this.analyzeBtn.disabled = true;
+                        return;
+                    }
+                    
+                    this.analyzeBtn.disabled = false;
+                }
+
+                async performAnalysis() {
+                    const imageId = this.imageSelect.value;
+                    if (!imageId) {
+                        alert('请先选择一张图片');
+                        return;
+                    }
+
+                    // 显示加载状态
+                    this.analyzeBtn.innerHTML = '<span class="spinner"></span> 分析中...';
+                    this.analyzeBtn.disabled = true;
+
+                    try {
+                        // 模拟光谱分析过程（实际项目中这里应该是调用后端分析API）
+                        // 生成模拟光谱数据
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
+                        // 生成模拟数据
+                        this.generateMockSpectrumData();
+                        
+                        // 渲染图表
+                        this.renderChart();
+                        
+                        // 渲染表格数据
+                        this.renderTableData();
+                        
+                        // 生成分析报告
+                        this.generateReport();
+                        
+                        // 恢复按钮状态
+                        this.analyzeBtn.innerHTML = '<span class="btn-icon">📊</span> 开始分析';
+                        this.analyzeBtn.disabled = false;
+                    } catch (error) {
+                        console.error('分析失败:', error);
+                        this.analyzeBtn.innerHTML = '<span class="btn-icon">📊</span> 开始分析';
+                        this.analyzeBtn.disabled = false;
+                        alert('分析失败，请重试');
+                    }
+                }
+
+                generateMockSpectrumData() {
+                    const start = parseInt(this.startWavelength.value);
+                    const end = parseInt(this.endWavelength.value);
+                    const resolution = parseInt(this.resolution.value);
+                    
+                    this.spectrumData = [];
+                    
+                    for (let wavelength = start; wavelength <= end; wavelength += resolution) {
+                        // 生成模拟光谱数据
+                        const baseValue = 50 + 30 * Math.sin(wavelength / 100);
+                        const randomFactor = 0.8 + 0.4 * Math.random();
+                        const reflectance = Math.min(100, Math.max(0, baseValue * randomFactor));
+                        const absorption = 100 - reflectance;
+                        
+                        this.spectrumData.push({
+                            wavelength,
+                            reflectance: parseFloat(reflectance.toFixed(2)),
+                            absorption: parseFloat(absorption.toFixed(2))
+                        });
+                    }
+                }
+
+                renderChart() {
+                    const ctx = document.getElementById('spectrumChart').getContext('2d');
+                    
+                    // 销毁之前的图表实例
+                    if (this.chart) {
+                        this.chart.destroy();
+                    }
+                    
+                    // 准备图表数据
+                    const wavelengths = this.spectrumData.map(d => d.wavelength);
+                    const reflectances = this.spectrumData.map(d => d.reflectance);
+                    const absorptions = this.spectrumData.map(d => d.absorption);
+                    
+                    this.chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: wavelengths,
+                            datasets: [
+                                {
+                                    label: '反射率 (%)',
+                                    data: reflectances,
+                                    borderColor: '#36A2EB',
+                                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                                    borderWidth: 2,
+                                    fill: false,
+                                    tension: 0.1
+                                },
+                                {
+                                    label: '吸收率 (%)',
+                                    data: absorptions,
+                                    borderColor: '#FF6384',
+                                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                    borderWidth: 2,
+                                    fill: false,
+                                    tension: 0.1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: '波长 (nm)'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: '百分比 (%)'
+                                    },
+                                    min: 0,
+                                    max: 100
+                                }
+                            }
+                        }
+                    });
+                }
+
+                renderTableData() {
+                    this.dataTableBody.innerHTML = '';
+                    
+                    this.spectrumData.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.wavelength}</td>
+                            <td>${row.reflectance}</td>
+                            <td>${row.absorption}</td>
+                        `;
+                        this.dataTableBody.appendChild(tr);
+                    });
+                }
+
+                generateReport() {
+                    // 计算一些统计值
+                    const avgReflectance = this.spectrumData.reduce((sum, d) => sum + d.reflectance, 0) / this.spectrumData.length;
+                    const avgAbsorption = this.spectrumData.reduce((sum, d) => sum + d.absorption, 0) / this.spectrumData.length;
+                    const maxReflectance = Math.max(...this.spectrumData.map(d => d.reflectance));
+                    const minReflectance = Math.min(...this.spectrumData.map(d => d.reflectance));
+                    
+                    this.analysisReport.innerHTML = `
+                        <h5>种子活力分析结果</h5>
+                        <p><strong>平均反射率:</strong> ${avgReflectance.toFixed(2)}%</p>
+                        <p><strong>平均吸收率:</strong> ${avgAbsorption.toFixed(2)}%</p>
+                        <p><strong>最高反射率:</strong> ${maxReflectance.toFixed(2)}%</p>
+                        <p><strong>最低反射率:</strong> ${minReflectance.toFixed(2)}%</p>
+                        <p><strong>分析结论:</strong> 根据光谱数据分析，该种子样本表现出良好的活力特征。反射率和吸收率曲线符合健康种子的标准模式。</p>
+                        <p><strong>建议:</strong> 可进一步进行发芽试验验证分析结果，并与其他批次种子进行对比分析。</p>
+                    `;
+                }
+
+                switchTab(event) {
+                    const tabId = event.target.getAttribute('data-tab');
+                    
+                    // 移除所有激活状态
+                    this.tabBtns.forEach(btn => btn.classList.remove('active'));
+                    this.tabPanes.forEach(pane => pane.classList.remove('active'));
+                    
+                    // 激活当前标签
+                    event.target.classList.add('active');
+                    document.getElementById(`${tabId}Tab`).classList.add('active');
+                }
+            }
+            
+            // 初始化页面
+            window.spectrumAnalyzer = new SpectrumAnalyzer();
+        }
+    </script>
+</body>
+</html>

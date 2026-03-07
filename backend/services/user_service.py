@@ -77,3 +77,31 @@ class UserService:
         user.is_active = not user.is_active
         db.session.commit()
         return user.to_admin_dict()
+
+    @staticmethod
+    def create_super_admin(username, email, password):
+        """创建超级管理员"""
+        if User.query.filter_by(username=username).first():
+            print(f"Super admin {username} already exists.")
+            return None
+        
+        super_admin = User(username=username, email=email, role=2)  # 2表示超级管理员
+        super_admin.set_password(password)
+        db.session.add(super_admin)
+        db.session.commit()
+        print(f"Super admin {username} created successfully.")
+        return super_admin.to_dict()
+
+    @staticmethod
+    def create_user(username, email, password, role=0):
+        """创建用户，role: 0-普通用户, 1-管理员, 2-超级管理员"""
+        if User.query.filter_by(username=username).first():
+            print(f"User {username} already exists.")
+            return None
+        
+        user = User(username=username, email=email, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        print(f"User {username} created successfully with role {role}.")
+        return user.to_dict()

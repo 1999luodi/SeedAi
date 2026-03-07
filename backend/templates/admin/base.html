@@ -44,9 +44,13 @@
             transition: var(--transition);
         }
 
-        .admin-nav a:hover,
+        .admin-nav a:hover {
+            background: #d3d3d3;
+            color: #333;
+        }
+
         .admin-nav a.active {
-            background: var(--primary-color);
+            background: #707070;
             color: white;
         }
 
@@ -230,6 +234,63 @@
             // 添加一些基础的交互功能
             console.log('SeedAI 管理后台已加载');
         });
+
+        // 从localStorage获取token并设置到请求头中
+        // 为所有fetch请求添加默认行为
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            // 从localStorage获取token
+            const token = localStorage.getItem('token');
+            if (token && args[1] && typeof args[1] === 'object') {
+                // 如果请求头中还没有Authorization，且请求是API请求，则添加token
+                if (!args[1].headers || !args[1].headers.Authorization) {
+                    args[1].headers = {
+                        ...args[1].headers,
+                        'Authorization': `Bearer ${token}`
+                    };
+                }
+            } else if (token) {
+                // 如果没有传入请求配置，则创建一个带有token的配置
+                if (!args[1]) {
+                    args[1] = {};
+                }
+                args[1].headers = {
+                    ...(args[1].headers || {}),
+                    'Authorization': `Bearer ${token}`
+                };
+            }
+
+            return originalFetch.apply(this, args);
+        };
+
+        // 为XMLHttpRequest也添加类似功能
+        const originalOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url) {
+            // 保存URL以便在send中使用
+            this._url = url;
+            return originalOpen.apply(this, arguments);
+        };
+
+        const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+        XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+            if (header.toLowerCase() === 'authorization') {
+                // 如果手动设置了Authorization头，则跳过自动设置
+                this._hasAuth = true;
+            }
+            return originalSetRequestHeader.apply(this, arguments);
+        };
+
+        const originalSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function(body) {
+            // 检查是否是API请求，且没有手动设置Authorization头
+            if (this._url && this._url.includes('/api/') && !this._hasAuth) {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    this.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+            return originalSend.apply(this, arguments);
+        };
     </script>
 </body>
 </html>

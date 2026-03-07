@@ -182,10 +182,39 @@ class SeedAIApp {
     }
 
     init() {
+        // 检查是否在首页，如果是则不执行初始化
+        if (window.location.pathname.endsWith('index.html')) {
+            return;
+        }
+        
         this.bindEvents();
+        this.bindNavigation();
         this.updateAuthStatus();
         this.loadStats();
         this.loadRecentUploads();
+    }
+
+    bindNavigation() {
+        // 导航检查 - 未登录用户点击受保护菜单项时跳转到登录页
+        const navLinks = document.querySelectorAll('.nav-link[data-action="checkLogin"]');
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // 检查是否已登录
+                if (!Utils.isLoggedIn()) {
+                    // 跳转到登录页面
+                    window.location.href = 'login.html';
+                } else {
+                    // 已登录，跳转到目标页面
+                    const href = link.getAttribute('data-href');
+                    if (href) {
+                        window.location.href = href;
+                    }
+                }
+            });
+        });
     }
 
     bindEvents() {
@@ -229,15 +258,22 @@ class SeedAIApp {
     updateAuthStatus() {
         const loginLink = document.getElementById('loginLink');
         if (Utils.isLoggedIn()) {
-            loginLink.textContent = '登出';
-            loginLink.href = '#';
-            loginLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                Utils.logout();
-            });
+            if (loginLink && loginLink.textContent !== '登出') {
+                loginLink.textContent = '登出';
+                loginLink.href = '#';
+                // 移除旧事件监听器以避免重复绑定
+                loginLink.replaceWith(loginLink.cloneNode(true)); // 克隆节点以移除所有事件监听器
+                const newLoginLink = document.getElementById('loginLink');
+                newLoginLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    Utils.logout();
+                });
+            }
         } else {
-            loginLink.textContent = '登录';
-            loginLink.href = 'login.html';
+            if (loginLink && loginLink.textContent !== '登录') {
+                loginLink.textContent = '登录';
+                loginLink.href = 'login.html';
+            }
         }
     }
 
@@ -406,4 +442,137 @@ class SeedAIApp {
 // 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
     new SeedAIApp();
+});
+
+// 统一的导航栏初始化函数，可在所有页面使用
+function initializeNavigation() {
+    // 只在非首页运行完整的导航初始化
+    if (!window.location.pathname.endsWith('index.html')) {
+        updateNavDisplay();
+        setupProtectedLinks();
+        
+        // 加载统计数据
+        loadStats();
+    }
+}
+
+// 更新导航栏显示 - 统一处理所有页面的导航栏
+function updateNavDisplay() {
+    const isLoggedIn = Utils.isLoggedIn();
+    const loginLink = document.getElementById('loginLink');
+    const profileLink = document.getElementById('profileLink');
+    const logoutLink = document.getElementById('logoutLink');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    
+    if (profileLink && logoutLink && usernameDisplay) {
+        // 如果页面有profileLink（如首页），使用这个显示方式
+        if (isLoggedIn) {
+            // 用户已登录，显示用户名和退出链接
+            if(loginLink) loginLink.style.display = 'none';
+            profileLink.style.display = 'block';
+            
+            // 获取用户信息并显示用户名
+            getUserInfo().then(userInfo => {
+                if (userInfo && usernameDisplay) {
+                    usernameDisplay.textContent = userInfo.username;
+                }
+            });
+            
+            // 为退出登录链接添加事件监听器
+            if(logoutLink) {
+                // 移除旧事件监听器以避免重复绑定
+                logoutLink.replaceWith(logoutLink.cloneNode(true));
+                const newLogoutLink = document.getElementById('logoutLink');
+                newLogoutLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    Utils.logout(); // 使用Utils类的登出方法
+                });
+            }
+        } else {
+            // 用户未登录，显示登录链接
+            if(loginLink) loginLink.style.display = 'block';
+            profileLink.style.display = 'none';
+        }
+    } else if (loginLink) {
+        // 如果页面只有loginLink（如其他页面），使用updateAuthStatus逻辑
+        const appInstance = new SeedAIApp();
+        appInstance.updateAuthStatus();
+    }
+}
+
+// 获取用户信息
+async function getUserInfo() {
+    const token = Utils.getToken();
+    
+    if (!token) {
+        return null;
+    }
+    
+    try {
+        const response = await fetch('/api/users/profile', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.data;
+        } else {
+            // 如果获取用户信息失败，可能是token无效，清除本地token
+            Utils.logout(); // 使用Utils类的登出方法
+            return null;
+        }
+    } catch (error) {
+        console.error('获取用户信息失败:', error);
+        Utils.logout(); // 使用Utils类的登出方法
+        return null;
+    }
+}
+
+// 退出登录
+function logout() {
+    localStorage.removeItem('token');
+    updateNavDisplay();
+    
+    // 重定向到首页
+    window.location.href = 'index.html';
+}
+
+// 检查登录并跳转
+function checkLoginAndRedirect(href) {
+    if (!Utils.isLoggedIn()) {
+        // 未登录，跳转到登录页面
+        window.location.href = 'login.html';
+    } else {
+        // 已登录，跳转到目标页面
+        window.location.href = href;
+    }
+}
+
+// 为受保护的链接添加点击事件监听器
+function setupProtectedLinks() {
+    const protectedLinks = document.querySelectorAll('.protected');
+    
+    protectedLinks.forEach(link => {
+        // 移除旧事件监听器以避免重复绑定
+        link.replaceWith(link.cloneNode(true)); // 克隆节点以移除所有事件监听器
+        const newLink = document.querySelector(`[data-href="${link.getAttribute('data-href')}"]`);
+        if (newLink) {
+            newLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const href = this.getAttribute('data-href');
+                checkLoginAndRedirect(href);
+            });
+        }
+    });
+}
+
+// 页面加载完成后执行初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 只在非首页初始化SeedAIApp
+    if (!window.location.pathname.endsWith('index.html')) {
+        window.app = new SeedAIApp();
+    }
+    initializeNavigation();
 });

@@ -3,8 +3,13 @@ from werkzeug.exceptions import BadRequest
 
 class DatasetService:
     @staticmethod
-    def create_dataset(name, description, created_by):
-        dataset = Dataset(name=name, description=description, created_by=created_by)
+    def create_dataset(name, description, created_by, category='detection'):
+        dataset = Dataset(
+            name=name,
+            description=description,
+            category=category,
+            created_by=created_by
+        )
         db.session.add(dataset)
         db.session.commit()
         return dataset.to_dict()
@@ -30,6 +35,7 @@ class DatasetService:
         if not dataset or dataset.created_by != user_id:
             raise BadRequest("Dataset not found or access denied")
         
+        # 允许更新类别字段
         for key, value in data.items():
             if hasattr(dataset, key):
                 setattr(dataset, key, value)
@@ -61,6 +67,8 @@ class DatasetService:
             file_path=file_path
         )
         db.session.add(image)
+        # 上传新文件后更新数据集项目计数
+        dataset.item_count = (dataset.item_count or 0) + 1
         db.session.commit()
         return image.to_dict()
 

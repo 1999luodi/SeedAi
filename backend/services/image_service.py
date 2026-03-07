@@ -1,4 +1,4 @@
-from models import db, Image
+from models import db, Image, Annotation
 from werkzeug.exceptions import BadRequest
 
 class ImageService:
@@ -47,6 +47,57 @@ class ImageService:
     def get_image_count():
         """获取图片总数"""
         return Image.query.count()
+
+    @staticmethod
+    def add_annotation(image_id, label, x_min, y_min, x_max, y_max, confidence=1.0):
+        """添加标注"""
+        image = Image.query.get(image_id)
+        if not image:
+            raise BadRequest("Image not found")
+        
+        annotation = Annotation(
+            image_id=image_id,
+            label=label,
+            x_min=x_min,
+            y_min=y_min,
+            x_max=x_max,
+            y_max=y_max,
+            confidence=confidence
+        )
+        db.session.add(annotation)
+        db.session.commit()
+        return annotation.to_dict()
+
+    @staticmethod
+    def get_annotations_by_image(image_id):
+        """获取图片的所有标注"""
+        annotations = Annotation.query.filter_by(image_id=image_id).all()
+        return [annotation.to_dict() for annotation in annotations]
+
+    @staticmethod
+    def update_annotation(annotation_id, **kwargs):
+        """更新标注"""
+        annotation = Annotation.query.get(annotation_id)
+        if not annotation:
+            raise BadRequest("Annotation not found")
+        
+        for key, value in kwargs.items():
+            if hasattr(annotation, key):
+                setattr(annotation, key, value)
+        
+        db.session.commit()
+        return annotation.to_dict()
+
+    @staticmethod
+    def delete_annotation(annotation_id):
+        """删除标注"""
+        annotation = Annotation.query.get(annotation_id)
+        if not annotation:
+            raise BadRequest("Annotation not found")
+        
+        db.session.delete(annotation)
+        db.session.commit()
+        return True
 
     @staticmethod
     def delete_image_admin(image_id):

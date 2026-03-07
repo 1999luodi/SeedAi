@@ -18,9 +18,11 @@
                 <nav class="nav">
                     <ul>
                         <li><a href="index.html">首页</a></li>
-                        <li><a href="login.html" class="active">登录</a></li>
+                        <li><a href="spectrum.html">光谱分析</a></li>
+                        <li><a href="detection.html">AI检测</a></li>
                         <li><a href="dataset.html">数据集</a></li>
-                        <li><a href="annotate.html">标注</a></li>
+                        <li><a href="annotate.html">手工标注</a></li>
+                        <li><a href="login.html" class="active">登录/注册</a></li>
                     </ul>
                 </nav>
             </div>
@@ -31,33 +33,32 @@
         <div class="auth-container">
             <div class="auth-card">
                 <div class="auth-header">
-                    <h2>欢迎回来</h2>
-                    <p>登录您的SeedAI账户</p>
+                    <h2 id="authTitle">欢迎回来</h2>
+                    <p id="authSubtitle">登录您的SeedAI账户</p>
                 </div>
 
-                <form id="loginForm" class="auth-form">
+                <!-- 登录表单 -->
+                <form id="loginForm" class="auth-form active-form">
                     <div class="form-group">
-                        <label for="username">用户名或邮箱</label>
+                        <label for="loginUsername">用户名或邮箱</label>
                         <input
                             type="text"
-                            id="username"
+                            id="loginUsername"
                             placeholder="输入用户名或邮箱"
                             required
-                            autocomplete="username"
                         >
                     </div>
 
                     <div class="form-group">
-                        <label for="password">密码</label>
+                        <label for="loginPassword">密码</label>
                         <div class="password-input">
                             <input
                                 type="password"
-                                id="password"
+                                id="loginPassword"
                                 placeholder="输入密码"
                                 required
-                                autocomplete="current-password"
                             >
-                            <button type="button" class="password-toggle" id="passwordToggle">
+                            <button type="button" class="password-toggle" id="loginPasswordToggle">
                                 👁️
                             </button>
                         </div>
@@ -78,73 +79,111 @@
                     </button>
                 </form>
 
+                <!-- 注册表单 -->
+                <form id="registerForm" class="auth-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="regUsername">用户名</label>
+                        <input
+                            type="text"
+                            id="regUsername"
+                            placeholder="输入用户名（3-20字符）"
+                            required
+                            minlength="3"
+                            maxlength="20"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="regEmail">邮箱</label>
+                        <input
+                            type="email"
+                            id="regEmail"
+                            placeholder="输入邮箱地址"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">密码</label>
+                        <div class="password-input">
+                            <input
+                                type="password"
+                                id="regPassword"
+                                placeholder="输入密码（至少6位）"
+                                required
+                                minlength="6"
+                            >
+                            <button type="button" class="password-toggle" id="regPasswordToggle">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="regConfirmPassword">确认密码</label>
+                        <div class="password-input">
+                            <input
+                                type="password"
+                                id="regConfirmPassword"
+                                placeholder="再次输入密码"
+                                required
+                            >
+                            <button type="button" class="password-toggle" id="regConfirmPasswordToggle">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="registerBtn">
+                        <span class="btn-icon">✓</span>
+                        注册
+                    </button>
+                </form>
+
                 <div class="auth-divider">
                     <span>或</span>
                 </div>
 
                 <div class="auth-links">
-                    <p>还没有账户？<a href="#" id="registerLink">立即注册</a></p>
+                    <p id="switchFormText">还没有账户？<a href="#" id="switchToRegister">立即注册</a></p>
                 </div>
 
                 <div class="auth-footer">
-                    <p>登录即表示您同意我们的 <a href="#">服务条款</a> 和 <a href="#">隐私政策</a></p>
+                    <p>使用即表示您同意我们的 <a href="#">服务条款</a> 和 <a href="#">隐私政策</a></p>
                 </div>
             </div>
 
             <div class="auth-sidebar">
                 <div class="auth-feature">
-                    <div class="feature-icon">🚀</div>
-                    <h3>快速开始</h3>
-                    <p>几秒钟内开始您的AI标注项目</p>
+                    <div class="feature-icon">🎯</div>
+                    <h3>发芽检测</h3>
+                    <p>实时准确识别种子发芽情况</p>
                 </div>
                 <div class="auth-feature">
-                    <div class="feature-icon">🤖</div>
-                    <h3>AI辅助</h3>
-                    <p>智能识别和自动标注，节省80%时间</p>
+                    <div class="feature-icon">📊</div>
+                    <h3>光谱分析</h3>
+                    <p>分析种子活力和品质指标</p>
                 </div>
                 <div class="auth-feature">
-                    <div class="feature-icon">👥</div>
-                    <h3>团队协作</h3>
-                    <p>多人协作，实时同步标注进度</p>
+                    <div class="feature-icon">📁</div>
+                    <h3>数据管理</h3>
+                    <p>组织和管理您的数据集</p>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- 注册模态框 -->
-    <div class="modal" id="registerModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>创建账户</h3>
-                <button class="modal-close" id="closeRegisterModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="registerForm">
-                    <div class="form-group">
-                        <label for="regUsername">用户名</label>
-                        <input type="text" id="regUsername" placeholder="输入用户名" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="regEmail">邮箱</label>
-                        <input type="email" id="regEmail" placeholder="输入邮箱地址" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="regPassword">密码</label>
-                        <input type="password" id="regPassword" placeholder="输入密码（至少6位）" required minlength="6">
-                    </div>
-                    <div class="form-group">
-                        <label for="regConfirmPassword">确认密码</label>
-                        <input type="password" id="regConfirmPassword" placeholder="再次输入密码" required>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" id="cancelRegister">取消</button>
-                        <button type="submit" class="btn btn-primary">注册</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <script>
+        // 检查用户是否已登录，如果是，则重定向到首页
+        function checkAlreadyLoggedIn() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                window.location.href = 'index.html';
+            }
+        }
 
+        // 在页面加载时检查登录状态
+        document.addEventListener('DOMContentLoaded', checkAlreadyLoggedIn);
+
+        // 登录和注册功能保持不变...
+    </script>
     <script src="js/login.js"></script>
 </body>
 </html>

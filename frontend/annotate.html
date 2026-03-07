@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图像标注 - SeedAI</title>
+    <title>手工标注 - SeedAI</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
 </head>
@@ -18,9 +18,15 @@
                 <nav class="nav">
                     <ul>
                         <li><a href="index.html">首页</a></li>
-                        <li><a href="login.html" id="loginLink">登录</a></li>
+                        <li><a href="spectrum.html">光谱分析</a></li>
+                        <li><a href="detection.html">AI检测</a></li>
                         <li><a href="dataset.html">数据集</a></li>
-                        <li><a href="annotate.html" class="active">标注</a></li>
+                        <li><a href="annotate.html" class="active">手工标注</a></li>
+                        <li><a href="javascript:void(0)" id="profileLink" style="display:none;">
+                            <span id="usernameDisplay"></span>
+                            <span id="logoutLink" style="cursor:pointer;margin-left:10px;">退出</span>
+                        </a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
                     </ul>
                 </nav>
             </div>
@@ -28,153 +34,103 @@
     </header>
 
     <main class="main">
-        <div class="page-header">
-            <div class="container">
-                <div class="page-header-content">
-                    <h2>🎯 图像标注</h2>
-                    <p id="datasetInfo">选择数据集开始标注</p>
-                    <div class="page-actions">
-                        <button class="btn btn-secondary" id="changeDatasetBtn">
-                            <span class="btn-icon">📁</span>
-                            切换数据集
-                        </button>
-                        <button class="btn btn-outline" id="autoLabelBtn">
-                            <span class="btn-icon">🤖</span>
-                            AI辅助标注
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="container">
-            <!-- 标注工作区 -->
-            <div class="annotation-workspace">
-                <!-- 图像显示区域 -->
-                <div class="image-section">
-                    <div class="image-container">
-                        <div class="image-toolbar">
-                            <div class="zoom-controls">
-                                <button class="btn-icon-btn" id="zoomOutBtn" title="缩小">🔍-</button>
-                                <span id="zoomLevel">100%</span>
-                                <button class="btn-icon-btn" id="zoomInBtn" title="放大">🔍+</button>
-                                <button class="btn-icon-btn" id="fitToScreenBtn" title="适应屏幕">📐</button>
-                            </div>
-                            <div class="image-info">
-                                <span id="imageCounter">0 / 0</span>
-                                <span id="imageFilename">-</span>
-                            </div>
-                        </div>
-                        <div class="image-viewport">
-                            <img id="currentImage" src="" alt="标注图像" style="display: none;">
-                            <div class="image-placeholder" id="imagePlaceholder">
-                                <div class="placeholder-icon">🖼️</div>
-                                <p>请选择数据集开始标注</p>
-                            </div>
-                        </div>
-                    </div>
+            <div class="page-header">
+                <h1>✏️ 手工标注</h1>
+                <p>手动创建和编辑图像标注框</p>
+            </div>
 
-                    <!-- 导航控制 -->
-                    <div class="navigation-controls">
-                        <button class="btn btn-secondary" id="prevBtn" disabled>
-                            <span class="btn-icon">⬅️</span>
-                            上一张
-                        </button>
-                        <div class="progress-indicator">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
-                            <span id="progressText">0%</span>
-                        </div>
-                        <button class="btn btn-secondary" id="nextBtn" disabled>
-                            下一张
-                            <span class="btn-icon">➡️</span>
-                        </button>
-                    </div>
+            <div class="annotation-controls">
+                <div class="control-group">
+                    <label for="annotationDatasetSelect">选择数据集:</label>
+                    <select id="annotationDatasetSelect">
+                        <option value="">-- 请选择数据集 --</option>
+                    </select>
                 </div>
+                
+                <div class="control-group">
+                    <label for="annotationImageSelect">选择图片:</label>
+                    <select id="annotationImageSelect">
+                        <option value="">-- 请先选择数据集 --</option>
+                    </select>
+                </div>
+                
+                <button id="loadImageBtn" class="btn btn-primary" disabled>
+                    <span class="btn-icon">🖼️</span>
+                    加载图片
+                </button>
+            </div>
 
-                <!-- 标注工具面板 -->
-                <div class="tools-panel">
-                    <div class="tools-section">
-                        <h3>📝 标签管理</h3>
-                        <div class="label-input-group">
-                            <input type="text" id="labelInput" placeholder="输入标签名称" maxlength="50">
-                            <button class="btn btn-primary" id="addLabelBtn">
-                                <span class="btn-icon">➕</span>
-                                添加
+            <div class="annotation-workspace">
+                <div class="annotation-tools">
+                    <div class="tool-group">
+                        <h3>标注工具</h3>
+                        <div class="tool-buttons">
+                            <button id="rectTool" class="btn btn-tool active" data-tool="rectangle">
+                                <span class="btn-icon">⬜</span>
+                                矩形
+                            </button>
+                            <button id="polygonTool" class="btn btn-tool" data-tool="polygon">
+                                <span class="btn-icon">🔺</span>
+                                多边形
+                            </button>
+                            <button id="circleTool" class="btn btn-tool" data-tool="circle">
+                                <span class="btn-icon">⭕</span>
+                                圆形
                             </button>
                         </div>
-
-                        <!-- 常用标签 -->
-                        <div class="common-labels">
-                            <h4>常用标签</h4>
-                            <div class="label-tags" id="commonTags">
-                                <span class="label-tag" data-label="person">person</span>
-                                <span class="label-tag" data-label="car">car</span>
-                                <span class="label-tag" data-label="dog">dog</span>
-                                <span class="label-tag" data-label="cat">cat</span>
-                                <span class="label-tag" data-label="tree">tree</span>
-                                <span class="label-tag" data-label="building">building</span>
-                            </div>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <h3>标注类别</h3>
+                        <div class="label-input">
+                            <input type="text" id="labelInput" placeholder="输入标注类别" value="种子">
+                            <button id="addLabel" class="btn btn-secondary">添加</button>
                         </div>
-
-                        <!-- 当前标签列表 -->
-                        <div class="current-labels">
-                            <h4>当前标签</h4>
-                            <div class="labels-list" id="labelsList">
-                                <div class="empty-state">
-                                    <p>暂无标签</p>
-                                    <p>点击上方添加或选择常用标签</p>
-                                </div>
+                        <div class="labels-list" id="labelsList">
+                            <div class="label-item active" data-label="种子">
+                                <span class="label-color" style="background-color: #3b82f6;"></span>
+                                <span class="label-name">种子</span>
+                                <button class="label-remove" data-label="种子">×</button>
                             </div>
                         </div>
                     </div>
-
-                    <div class="tools-section">
-                        <h3>💾 操作</h3>
-                        <div class="action-buttons">
-                            <button class="btn btn-success" id="saveBtn" disabled>
+                    
+                    <div class="tool-group">
+                        <h3>操作</h3>
+                        <div class="operation-buttons">
+                            <button id="saveAnnotation" class="btn btn-primary" disabled>
                                 <span class="btn-icon">💾</span>
                                 保存标注
                             </button>
-                            <button class="btn btn-outline" id="skipBtn" disabled>
-                                <span class="btn-icon">⏭️</span>
-                                跳过
-                            </button>
-                            <button class="btn btn-danger" id="clearLabelsBtn" disabled>
+                            <button id="clearAnnotations" class="btn btn-warning">
                                 <span class="btn-icon">🗑️</span>
-                                清空标签
+                                清空标注
                             </button>
-                        </div>
-
-                        <!-- 标注统计 -->
-                        <div class="annotation-stats">
-                            <h4>📊 标注统计</h4>
-                            <div class="stats-grid">
-                                <div class="stat-item">
-                                    <span class="stat-label">已标注:</span>
-                                    <span class="stat-value" id="annotatedCount">0</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-label">总图片:</span>
-                                    <span class="stat-value" id="totalImages">0</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-label">完成率:</span>
-                                    <span class="stat-value" id="completionRate">0%</span>
-                                </div>
-                            </div>
+                            <button id="exportAnnotations" class="btn btn-secondary" disabled>
+                                <span class="btn-icon">📤</span>
+                                导出标注
+                            </button>
                         </div>
                     </div>
-
-                    <!-- AI 建议 -->
-                    <div class="tools-section ai-suggestions" id="aiSuggestions" style="display: none;">
-                        <h3>🤖 AI 建议标签</h3>
-                        <div class="ai-tags" id="aiTags">
-                            <div class="loading">正在分析图像...</div>
+                </div>
+                
+                <div class="annotation-canvas">
+                    <div class="image-container">
+                        <div class="image-placeholder" id="annotationPlaceholder">
+                            <div class="placeholder-content">
+                                <span class="placeholder-icon">🖼️</span>
+                                <p>请选择图片并加载进行标注</p>
+                            </div>
                         </div>
-                        <div class="ai-confidence">
-                            <small>AI 建议基于图像内容分析，结果仅供参考</small>
+                        <canvas id="annotationCanvas"></canvas>
+                        <img id="annotationImage" src="" alt="标注图像" style="display: none;">
+                    </div>
+                    
+                    <div class="annotation-list">
+                        <h3>当前标注</h3>
+                        <div id="annotationList">
+                            <p class="no-annotations">暂无标注</p>
                         </div>
                     </div>
                 </div>
@@ -182,21 +138,600 @@
         </div>
     </main>
 
-    <!-- 数据集选择模态框 -->
-    <div class="modal" id="datasetModal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>选择数据集</h3>
-                <button class="modal-close" id="closeDatasetModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="dataset-selector" id="datasetSelector">
-                    <div class="loading">加载数据集中...</div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <script>
+        // 检查用户登录状态
+        function checkLoginStatus() {
+            const token = localStorage.getItem('token');
+            return !!token;
+        }
 
-    <script src="js/annotate.js"></script>
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = 'index.html';
+        }
+
+        // 初始化页面时检查登录状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const isLoggedIn = checkLoginStatus();
+            const loginLink = document.getElementById('loginLink');
+            const profileLink = document.getElementById('profileLink');
+            const logoutLink = document.getElementById('logoutLink');
+            const usernameDisplay = document.getElementById('usernameDisplay');
+            
+            if (isLoggedIn) {
+                // 用户已登录，显示用户名和退出链接
+                loginLink.style.display = 'none';
+                profileLink.style.display = 'block';
+                
+                // 获取用户信息并显示用户名
+                fetch('/api/users/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        usernameDisplay.textContent = data.data.username;
+                    }
+                })
+                .catch(err => console.error('获取用户信息失败:', err));
+                
+                // 为退出登录链接添加事件监听器
+                if (logoutLink) {
+                    logoutLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        logout();
+                    });
+                }
+            } else {
+                // 用户未登录，跳转到登录页面
+                // 注意：这里我们不再强制跳转，而是显示登录链接
+                loginLink.style.display = 'block';
+                profileLink.style.display = 'none';
+            }
+            
+            // 初始化页面组件
+            initializeAnnotator();
+        });
+
+        function initializeAnnotator() {
+            // 标注类
+            class Annotator {
+                constructor() {
+                    this.datasets = [];
+                    this.images = [];
+                    this.annotations = [];
+                    this.currentImage = null;
+                    this.currentLabel = '种子';
+                    this.currentTool = 'rectangle';
+                    this.isDrawing = false;
+                    this.startX = 0;
+                    this.startY = 0;
+                    this.tempAnnotation = null;
+                    
+                    this.initElements();
+                    this.bindEvents();
+                    this.loadData();
+                    this.setupLabels();
+                }
+
+                initElements() {
+                    this.datasetSelect = document.getElementById('annotationDatasetSelect');
+                    this.imageSelect = document.getElementById('annotationImageSelect');
+                    this.loadImageBtn = document.getElementById('loadImageBtn');
+                    this.canvas = document.getElementById('annotationCanvas');
+                    this.ctx = this.canvas.getContext('2d');
+                    this.imagePlaceholder = document.getElementById('annotationPlaceholder');
+                    this.annotationImage = document.getElementById('annotationImage');
+                    this.annotationList = document.getElementById('annotationList');
+                    this.labelInput = document.getElementById('labelInput');
+                    this.addLabelBtn = document.getElementById('addLabel');
+                    this.labelsList = document.getElementById('labelsList');
+                    this.saveAnnotationBtn = document.getElementById('saveAnnotation');
+                    this.clearAnnotationsBtn = document.getElementById('clearAnnotations');
+                    this.exportAnnotationsBtn = document.getElementById('exportAnnotations');
+                    this.toolButtons = document.querySelectorAll('.btn-tool');
+                }
+
+                bindEvents() {
+                    this.datasetSelect.addEventListener('change', (e) => this.onDatasetChange(e));
+                    this.imageSelect.addEventListener('change', (e) => this.onImageChange(e));
+                    this.loadImageBtn.addEventListener('click', () => this.loadImage());
+                    
+                    // 工具按钮事件
+                    this.toolButtons.forEach(btn => {
+                        btn.addEventListener('click', (e) => this.selectTool(e));
+                    });
+                    
+                    // 标签相关事件
+                    this.addLabelBtn.addEventListener('click', () => this.addNewLabel());
+                    this.labelInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') this.addNewLabel();
+                    });
+                    
+                    // 画布事件
+                    this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                    this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+                    this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                    this.canvas.addEventListener('mouseleave', () => this.stopDrawing());
+                    
+                    // 按钮事件
+                    this.saveAnnotationBtn.addEventListener('click', () => this.saveAnnotations());
+                    this.clearAnnotationsBtn.addEventListener('click', () => this.clearAllAnnotations());
+                    this.exportAnnotationsBtn.addEventListener('click', () => this.exportAnnotations());
+                }
+
+                async loadData() {
+                    try {
+                        const token = localStorage.getItem('token');
+                        if (!token) {
+                            window.location.href = 'login.html';
+                            return;
+                        }
+                        
+                        const response = await fetch('/api/datasets', {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.datasets = data.data || [];
+                            this.renderDatasets();
+                        } else {
+                            console.error('获取数据集失败:', response.status);
+                        }
+                    } catch (error) {
+                        console.error('加载数据失败:', error);
+                    }
+                }
+
+                renderDatasets() {
+                    this.datasetSelect.innerHTML = '<option value="">-- 请选择数据集 --</option>';
+                    this.datasets.forEach(dataset => {
+                        const option = document.createElement('option');
+                        option.value = dataset.id;
+                        option.textContent = dataset.name;
+                        this.datasetSelect.appendChild(option);
+                    });
+                }
+
+                async onDatasetChange(event) {
+                    const datasetId = event.target.value;
+                    if (!datasetId) {
+                        this.imageSelect.innerHTML = '<option value="">-- 请先选择数据集 --</option>';
+                        this.loadImageBtn.disabled = true;
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`/api/datasets/${datasetId}/images`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.images = data.data || [];
+                            this.renderImages();
+                            this.loadImageBtn.disabled = false;
+                        }
+                    } catch (error) {
+                        console.error('加载图片失败:', error);
+                    }
+                }
+
+                renderImages() {
+                    this.imageSelect.innerHTML = '<option value="">-- 请选择图片 --</option>';
+                    this.images.forEach(image => {
+                        const option = document.createElement('option');
+                        option.value = image.id;
+                        option.textContent = image.filename;
+                        this.imageSelect.appendChild(option);
+                    });
+                }
+
+                async onImageChange(event) {
+                    const imageId = event.target.value;
+                    if (!imageId) {
+                        this.loadImageBtn.disabled = true;
+                        return;
+                    }
+                    
+                    this.loadImageBtn.disabled = false;
+                }
+
+                async loadImage() {
+                    const imageId = this.imageSelect.value;
+                    if (!imageId) {
+                        alert('请先选择一张图片');
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`/api/images/${imageId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const imageData = await response.json();
+                            this.currentImage = imageData.data;
+                            
+                            // 显示图片
+                            this.imagePlaceholder.style.display = 'none';
+                            this.annotationImage.src = this.currentImage.file_path;
+                            this.annotationImage.style.display = 'block';
+                            
+                            // 等待图片加载完成后再设置画布尺寸
+                            this.annotationImage.onload = () => {
+                                this.canvas.width = this.annotationImage.width;
+                                this.canvas.height = this.annotationImage.height;
+                                
+                                // 如果图片已有标注，则加载它们
+                                if (this.currentImage.annotations && this.currentImage.annotations.length > 0) {
+                                    this.annotations = [...this.currentImage.annotations];
+                                    this.renderAnnotations();
+                                } else {
+                                    this.annotations = [];
+                                    this.renderAnnotations();
+                                }
+                                
+                                // 启用保存和导出按钮
+                                this.saveAnnotationBtn.disabled = false;
+                                this.exportAnnotationsBtn.disabled = false;
+                            };
+                        }
+                    } catch (error) {
+                        console.error('加载图片失败:', error);
+                        alert('加载图片失败');
+                    }
+                }
+
+                setupLabels() {
+                    // 默认标签已添加，添加删除事件
+                    this.updateLabelEvents();
+                }
+
+                addNewLabel() {
+                    const labelName = this.labelInput.value.trim();
+                    if (!labelName) {
+                        alert('请输入标签名称');
+                        return;
+                    }
+
+                    // 检查标签是否已存在
+                    if (Array.from(this.labelsList.children).some(el => 
+                        el.getAttribute('data-label') === labelName)) {
+                        alert('标签已存在');
+                        return;
+                    }
+
+                    const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    const color = colors[this.labelsList.children.length % colors.length];
+
+                    const labelItem = document.createElement('div');
+                    labelItem.className = 'label-item';
+                    labelItem.setAttribute('data-label', labelName);
+                    labelItem.innerHTML = `
+                        <span class="label-color" style="background-color: ${color};"></span>
+                        <span class="label-name">${labelName}</span>
+                        <button class="label-remove" data-label="${labelName}">×</button>
+                    `;
+
+                    this.labelsList.appendChild(labelItem);
+                    this.labelInput.value = '';
+                    this.updateLabelEvents();
+                    
+                    // 设置新标签为当前标签
+                    this.setActiveLabel(labelName);
+                }
+
+                updateLabelEvents() {
+                    // 标签点击事件
+                    document.querySelectorAll('.label-item').forEach(item => {
+                        item.addEventListener('click', (e) => {
+                            if (!e.target.classList.contains('label-remove')) {
+                                const label = item.getAttribute('data-label');
+                                this.setActiveLabel(label);
+                            }
+                        });
+                    });
+
+                    // 删除标签事件
+                    document.querySelectorAll('.label-remove').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const label = btn.getAttribute('data-label');
+                            this.removeLabel(label);
+                        });
+                    });
+                }
+
+                setActiveLabel(label) {
+                    // 移除所有活动标签
+                    document.querySelectorAll('.label-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // 激活选定标签
+                    const activeItem = Array.from(this.labelsList.children).find(
+                        el => el.getAttribute('data-label') === label
+                    );
+                    
+                    if (activeItem) {
+                        activeItem.classList.add('active');
+                        this.currentLabel = label;
+                    }
+                }
+
+                removeLabel(label) {
+                    if (this.labelsList.children.length <= 1) {
+                        alert('至少需要保留一个标签');
+                        return;
+                    }
+                    
+                    const itemToRemove = Array.from(this.labelsList.children).find(
+                        el => el.getAttribute('data-label') === label
+                    );
+                    
+                    if (itemToRemove) {
+                        itemToRemove.remove();
+                        
+                        // 如果删除的是当前标签，切换到第一个标签
+                        if (label === this.currentLabel) {
+                            const firstLabel = this.labelsList.firstElementChild.getAttribute('data-label');
+                            this.setActiveLabel(firstLabel);
+                        }
+                    }
+                }
+
+                selectTool(event) {
+                    // 移除所有活动工具
+                    this.toolButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // 激活选定工具
+                    event.target.classList.add('active');
+                    this.currentTool = event.target.getAttribute('data-tool');
+                }
+
+                startDrawing(e) {
+                    if (!this.currentImage) return;
+                    
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.startX = e.clientX - rect.left;
+                    this.startY = e.clientY - rect.top;
+                    this.isDrawing = true;
+                    
+                    // 创建临时标注对象
+                    this.tempAnnotation = {
+                        id: Date.now(),
+                        x_min: this.startX / this.canvas.width,
+                        y_min: this.startY / this.canvas.height,
+                        x_max: this.startX / this.canvas.width,
+                        y_max: this.startY / this.canvas.height,
+                        label: this.currentLabel
+                    };
+                }
+
+                draw(e) {
+                    if (!this.isDrawing || !this.currentImage) return;
+                    
+                    const rect = this.canvas.getBoundingClientRect();
+                    const currentX = e.clientX - rect.left;
+                    const currentY = e.clientY - rect.top;
+                    
+                    // 更新临时标注的坐标
+                    this.tempAnnotation.x_max = currentX / this.canvas.width;
+                    this.tempAnnotation.y_max = currentY / this.canvas.height;
+                    
+                    // 重新绘制所有标注
+                    this.renderAnnotations();
+                    
+                    // 绘制临时标注（虚线）
+                    this.ctx.setLineDash([5, 3]);
+                    this.ctx.strokeStyle = '#3b82f6';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(
+                        this.tempAnnotation.x_min * this.canvas.width,
+                        this.tempAnnotation.y_min * this.canvas.height,
+                        (this.tempAnnotation.x_max - this.tempAnnotation.x_min) * this.canvas.width,
+                        (this.tempAnnotation.y_max - this.tempAnnotation.y_min) * this.canvas.height
+                    );
+                    this.ctx.setLineDash([]);
+                }
+
+                stopDrawing() {
+                    if (!this.isDrawing) return;
+                    
+                    this.isDrawing = false;
+                    
+                    // 将临时标注添加到标注列表
+                    if (this.tempAnnotation) {
+                        // 确保坐标顺序正确
+                        const normalizedAnnotation = {
+                            ...this.tempAnnotation,
+                            x_min: Math.min(this.tempAnnotation.x_min, this.tempAnnotation.x_max),
+                            y_min: Math.min(this.tempAnnotation.y_min, this.tempAnnotation.y_max),
+                            x_max: Math.max(this.tempAnnotation.x_min, this.tempAnnotation.x_max),
+                            y_max: Math.max(this.tempAnnotation.y_min, this.tempAnnotation.y_max)
+                        };
+                        
+                        this.annotations.push(normalizedAnnotation);
+                        this.tempAnnotation = null;
+                        
+                        // 重新渲染标注列表
+                        this.renderAnnotationList();
+                    }
+                }
+
+                renderAnnotations() {
+                    // 清除画布
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    // 绘制已保存的标注
+                    this.annotations.forEach(ann => {
+                        // 获取标签颜色
+                        const labelItems = Array.from(this.labelsList.children);
+                        const labelItem = labelItems.find(el => 
+                            el.getAttribute('data-label') === ann.label
+                        );
+                        const color = labelItem ? 
+                            getComputedStyle(labelItem.querySelector('.label-color')).backgroundColor : 
+                            '#3b82f6';
+                        
+                        // 绘制标注框
+                        this.ctx.strokeStyle = color;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(
+                            ann.x_min * this.canvas.width,
+                            ann.y_min * this.canvas.height,
+                            (ann.x_max - ann.x_min) * this.canvas.width,
+                            (ann.y_max - ann.y_min) * this.canvas.height
+                        );
+                        
+                        // 绘制标签背景
+                        this.ctx.fillStyle = color;
+                        this.ctx.fillRect(
+                            ann.x_min * this.canvas.width,
+                            ann.y_min * this.canvas.height - 20,
+                            this.ctx.measureText(ann.label).width + 10,
+                            20
+                        );
+                        
+                        // 绘制标签文本
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.font = '14px Arial';
+                        this.ctx.fillText(
+                            ann.label,
+                            ann.x_min * this.canvas.width + 5,
+                            ann.y_min * this.canvas.height - 5
+                        );
+                    });
+                    
+                    // 如果正在绘制，重新绘制临时标注
+                    if (this.tempAnnotation && this.isDrawing) {
+                        this.ctx.setLineDash([5, 3]);
+                        this.ctx.strokeStyle = '#3b82f6';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.strokeRect(
+                            this.tempAnnotation.x_min * this.canvas.width,
+                            this.tempAnnotation.y_min * this.canvas.height,
+                            (this.tempAnnotation.x_max - this.tempAnnotation.x_min) * this.canvas.width,
+                            (this.tempAnnotation.y_max - this.tempAnnotation.y_min) * this.canvas.height
+                        );
+                        this.ctx.setLineDash([]);
+                    }
+                }
+
+                renderAnnotationList() {
+                    if (this.annotations.length === 0) {
+                        this.annotationList.innerHTML = '<p class="no-annotations">暂无标注</p>';
+                        return;
+                    }
+
+                    this.annotationList.innerHTML = this.annotations.map((ann, index) => {
+                        // 获取标签颜色
+                        const labelItems = Array.from(this.labelsList.children);
+                        const labelItem = labelItems.find(el => 
+                            el.getAttribute('data-label') === ann.label
+                        );
+                        const color = labelItem ? 
+                            getComputedStyle(labelItem.querySelector('.label-color')).backgroundColor : 
+                            '#3b82f6';
+                        
+                        return `
+                            <div class="annotation-item">
+                                <div class="annotation-header">
+                                    <span class="annotation-label" style="background-color: ${color};">${ann.label}</span>
+                                    <button class="annotation-delete" data-index="${index}">×</button>
+                                </div>
+                                <div class="annotation-coords">
+                                    坐标: [${(ann.x_min * 100).toFixed(1)}%, ${(ann.y_min * 100).toFixed(1)}%, ${(ann.x_max * 100).toFixed(1)}%, ${(ann.y_max * 100).toFixed(1)}%]
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // 添加删除事件
+                    document.querySelectorAll('.annotation-delete').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const index = parseInt(btn.getAttribute('data-index'));
+                            this.deleteAnnotation(index);
+                        });
+                    });
+                }
+
+                deleteAnnotation(index) {
+                    this.annotations.splice(index, 1);
+                    this.renderAnnotations();
+                    this.renderAnnotationList();
+                }
+
+                async saveAnnotations() {
+                    if (!this.currentImage || this.annotations.length === 0) {
+                        alert('没有标注可保存');
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`/api/images/${this.currentImage.id}/annotations`, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ annotations: this.annotations })
+                        });
+
+                        if (response.ok) {
+                            alert('标注已保存！');
+                        } else {
+                            alert('保存失败');
+                        }
+                    } catch (error) {
+                        console.error('保存标注失败:', error);
+                        alert('保存失败: ' + error.message);
+                    }
+                }
+
+                clearAllAnnotations() {
+                    if (confirm('确定要清空所有标注吗？此操作不可恢复！')) {
+                        this.annotations = [];
+                        this.renderAnnotations();
+                        this.renderAnnotationList();
+                    }
+                }
+
+                exportAnnotations() {
+                    if (this.annotations.length === 0) {
+                        alert('没有标注可导出');
+                        return;
+                    }
+
+                    const dataStr = JSON.stringify(this.annotations, null, 2);
+                    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+                    const exportFileDefaultName = `annotations_${this.currentImage.id}.json`;
+
+                    const linkElement = document.createElement('a');
+                    linkElement.setAttribute('href', dataUri);
+                    linkElement.setAttribute('download', exportFileDefaultName);
+                    linkElement.click();
+                }
+            }
+            
+            // 初始化页面
+            window.annotator = new Annotator();
+        }
+    </script>
 </body>
 </html>

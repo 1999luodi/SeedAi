@@ -1,0 +1,42 @@
+{
+  "test_users": [
+    {
+      "username": "testuser1",
+      "email": "testuser1@example.com",
+      "password": "TestPassword123",
+      "description": "Basic test user 1"
+    },
+    {
+      "username": "testuser2",
+      "email": "testuser2@example.com", 
+      "password": "TestPassword456",
+      "description": "Basic test user 2"
+    },
+    {
+      "username": "admin_test",
+      "email": "admin@example.com",
+      "password": "AdminPassword789",
+      "description": "Admin user for testing"
+    }
+  ],
+  "invalid_users": [
+    {
+      "username": "",
+      "email": "invalid@example.com",
+      "password": "password",
+      "description": "Empty username"
+    },
+    {
+      "username": "validuser",
+      "email": "invalid-email",
+      "password": "password",
+      "description": "Invalid email format"
+    },
+    {
+      "username": "validuser",
+      "email": "valid@example.com",
+      "password": "123",
+      "description": "Password too short"
+    }
+  ]
+}

@@ -1,15 +1,22 @@
 services:
   mysql:
     image: mysql:8.0
+    container_name: seedai-mysql-1
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_DATABASE: ai_dataset
     volumes:
-      - D:/ai-porjects/SeedAi/mysql_data:/var/lib/mysql
+      - ./mysql_data/data:/var/lib/mysql
+      - ./mysql_data/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     restart: unless-stopped
 
   backend:
-    image: python:3.9-slim
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seedai-backend-1
     working_dir: /app
     volumes:
       - D:/ai-projects/SeedAi/backend:/app
@@ -17,7 +24,6 @@ services:
       - D:/ai-projects/SeedAi/datasets:/app/datasets
     ports:
       - "5000:5000"
-    command: bash -c "pip install -r requirements.txt && python app.py"
     environment:
       - DB_HOST=mysql
       - DB_USER=root
@@ -29,11 +35,13 @@ services:
     restart: unless-stopped
 
   ai_worker:
-    image: pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+    build:
+      context: ./pytorch_model
+      dockerfile: Dockerfile
+    container_name: seedai-ai_worker-1
     volumes:
       - D:/ai-projects/SeedAi/pytorch_model:/workspace
-      - D:/ai-projects/SeedAi/uploads:/workspace/uploads
-    command: python /workspace/inference.py
+    
     depends_on:
       - backend
     restart: unless-stopped
@@ -44,6 +52,7 @@ services:
       - "80:80"
     volumes:
       - D:/ai-projects/SeedAi/frontend:/usr/share/nginx/html
+      - D:/ai-projects/SeedAi/tests:/usr/share/nginx/html/tests
       - D:/ai-projects/SeedAi/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend

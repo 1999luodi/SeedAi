@@ -1,0 +1,164 @@
+{
+  "categories": [
+    {
+      "name": "认证",
+      "icon": "🔐",
+      "endpoints": [
+        {
+          "name": "用户登录",
+          "method": "POST",
+          "endpoint": "/api/auth/login",
+          "description": "用户登录获取JWT Token",
+          "example": {
+            "username_or_email": "admin",
+            "password": "123456"
+          }
+        },
+        {
+          "name": "后端管理员登录",
+          "method": "POST",
+          "endpoint": "/backend/login",
+          "description": "后端管理系统登录，需要管理员权限",
+          "example": {
+            "username_or_email": "admin",
+            "password": "123456"
+          }
+        },
+        {
+          "name": "用户注册",
+          "method": "POST",
+          "endpoint": "/api/auth/register",
+          "description": "注册新用户",
+          "example": {
+            "username": "newuser",
+            "email": "newuser@example.com",
+            "password": "SecurePassword123"
+          }
+        },
+        {
+          "name": "获取个人资料",
+          "method": "GET",
+          "endpoint": "/api/users/profile",
+          "description": "获取当前用户信息",
+          "example": {}
+        },
+        {
+          "name": "修改用户信息",
+          "method": "PUT",
+          "endpoint": "/api/users/profile",
+          "description": "修改当前用户信息",
+          "example": {
+            "email": "updated@example.com"
+          }
+        }
+      ]
+    },
+    {
+      "name": "用户管理",
+      "icon": "👥",
+      "endpoints": [
+        {
+          "name": "获取用户列表",
+          "method": "GET",
+          "endpoint": "/api/admin/users",
+          "description": "获取所有用户列表（管理员）",
+          "example": {}
+        },
+        {
+          "name": "切换用户状态",
+          "method": "POST",
+          "endpoint": "/api/admin/users/{user_id}/toggle-status",
+          "description": "启用/禁用用户账户",
+          "example": {}
+        }
+      ]
+    },
+    {
+      "name": "数据集管理",
+      "icon": "📊",
+      "endpoints": [
+        {
+          "name": "创建数据集",
+          "method": "POST",
+          "endpoint": "/api/datasets",
+          "description": "创建新的数据集",
+          "example": {
+            "name": "My Dataset",
+            "description": "A sample dataset for testing"
+          }
+        },
+        {
+          "name": "获取数据集列表",
+          "method": "GET",
+          "endpoint": "/api/datasets",
+          "description": "获取用户的数据集列表",
+          "example": {}
+        },
+        {
+          "name": "获取数据集详情",
+          "method": "GET",
+          "endpoint": "/api/datasets/{dataset_id}",
+          "description": "获取指定数据集的详细信息",
+          "example": {}
+        },
+        {
+          "name": "修改数据集介绍",
+          "method": "PUT",
+          "endpoint": "/api/datasets/{dataset_id}",
+          "description": "修改数据集信息",
+          "example": {
+            "name": "Updated Dataset Name",
+            "description": "Updated description"
+          }
+        },
+        {
+          "name": "删除数据集",
+          "method": "DELETE",
+          "endpoint": "/api/datasets/{dataset_id}",
+          "description": "删除指定数据集",
+          "example": {}
+        }
+      ]
+    },
+    {
+      "name": "图片管理",
+      "icon": "🖼️",
+      "endpoints": [
+        {
+          "name": "上传图片到数据集",
+          "method": "POST",
+          "endpoint": "/api/datasets/{dataset_id}/upload",
+          "description": "上传图片到指定数据集",
+          "example": {}
+        },
+        {
+          "name": "获取图片信息",
+          "method": "GET",
+          "endpoint": "/api/images/{image_id}",
+          "description": "获取指定图片的详细信息",
+          "example": {}
+        }
+      ]
+    },
+    {
+      "name": "系统",
+      "icon": "⚙️",
+      "endpoints": [
+        {
+          "name": "健康检查",
+          "method": "GET",
+          "endpoint": "/health",
+          "description": "检查后端服务健康状态",
+          "example": {}
+        },
+        {
+          "name": "获取API端点定义",
+          "method": "GET",
+          "endpoint": "/api/endpoints",
+          "description": "获取所有API端点的定义",
+          "example": {}
+        }
+      ]
+    }
+  ]
+}

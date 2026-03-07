@@ -1,4 +1,7 @@
 {
     "terminal.integrated.accessibleViewFocusOnCommandExecution": false,
-    "terminal.integrated.automationProfile.windows": {}
+    "terminal.integrated.automationProfile.windows": {},
+    "files.associations": {
+        "**/*.html": "html"
+    }
 }

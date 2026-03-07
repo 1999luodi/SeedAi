@@ -53,10 +53,11 @@ class Utils {
     static setLoading(button, loading = true) {
         if (loading) {
             button.disabled = true;
+            button.dataset.originalContent = button.innerHTML;
             button.innerHTML = '<span class="spinner"></span> 处理中...';
         } else {
             button.disabled = false;
-            button.innerHTML = '<span class="btn-icon">🔓</span> 登录';
+            button.innerHTML = button.dataset.originalContent || button.innerHTML;
         }
     }
 }
@@ -64,6 +65,12 @@ class Utils {
 // API请求类
 class API {
     static async request(endpoint, options = {}) {
+        // 如果访问端口是80或为空（默认），则使用相对路径（nginx代理）
+        // 否则直接连接到后端5000端口
+        const port = window.location.port;
+        const baseUrl = (port === '' || port === '80') ? '' : `http://localhost:5000`;
+        const url = `${baseUrl}/api${endpoint}`;
+        
         const defaultOptions = {
             headers: {
                 'Content-Type': 'application/json'
@@ -73,7 +80,7 @@ class API {
         const config = { ...defaultOptions, ...options };
 
         try {
-            const response = await fetch(`/api${endpoint}`, config);
+            const response = await fetch(url, config);
             const data = await response.json();
 
             if (!response.ok) {
@@ -98,6 +105,7 @@ class API {
 // 登录应用类
 class LoginApp {
     constructor() {
+        this.currentForm = 'login'; // 'login' or 'register'
         this.init();
     }
 
@@ -109,36 +117,48 @@ class LoginApp {
     bindEvents() {
         // 登录表单
         const loginForm = document.getElementById('loginForm');
-        const loginBtn = document.getElementById('loginBtn');
-
         loginForm.addEventListener('submit', (e) => this.handleLogin(e));
 
-        // 密码可见性切换
-        const passwordToggle = document.getElementById('passwordToggle');
-        passwordToggle.addEventListener('click', () => this.togglePasswordVisibility());
-
-        // 注册相关
-        const registerLink = document.getElementById('registerLink');
-        registerLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.showRegisterModal();
-        });
-
-        // 注册模态框
-        const closeRegisterModal = document.getElementById('closeRegisterModal');
-        const cancelRegister = document.getElementById('cancelRegister');
+        // 注册表单
         const registerForm = document.getElementById('registerForm');
-
-        closeRegisterModal.addEventListener('click', () => this.hideRegisterModal());
-        cancelRegister.addEventListener('click', () => this.hideRegisterModal());
         registerForm.addEventListener('submit', (e) => this.handleRegister(e));
 
-        // 点击模态框外部关闭
-        document.getElementById('registerModal').addEventListener('click', (e) => {
-            if (e.target.id === 'registerModal') {
-                this.hideRegisterModal();
-            }
-        });
+        // 密码可见性切换
+        const loginPasswordToggle = document.getElementById('loginPasswordToggle');
+        const regPasswordToggle = document.getElementById('regPasswordToggle');
+        const regConfirmPasswordToggle = document.getElementById('regConfirmPasswordToggle');
+
+        if (loginPasswordToggle) {
+            loginPasswordToggle.addEventListener('click', () => this.togglePasswordVisibility('loginPassword'));
+        }
+        if (regPasswordToggle) {
+            regPasswordToggle.addEventListener('click', () => this.togglePasswordVisibility('regPassword'));
+        }
+        if (regConfirmPasswordToggle) {
+            regConfirmPasswordToggle.addEventListener('click', () => this.togglePasswordVisibility('regConfirmPassword'));
+        }
+
+        // 表单切换
+        const switchToRegister = document.getElementById('switchToRegister');
+        if (switchToRegister) {
+            switchToRegister.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchForm('register');
+            });
+        }
+
+        // 返回登录链接的事件绑定
+        this.bindSwitchToLogin();
+    }
+
+    bindSwitchToLogin() {
+        const switchToLogin = document.getElementById('switchToLogin');
+        if (switchToLogin) {
+            switchToLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchForm('login');
+            });
+        }
     }
 
     checkAuthStatus() {
@@ -148,13 +168,44 @@ class LoginApp {
         }
     }
 
+    switchForm(formType) {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const authTitle = document.getElementById('authTitle');
+        const authSubtitle = document.getElementById('authSubtitle');
+        const switchFormText = document.getElementById('switchFormText');
+
+        if (formType === 'register') {
+            loginForm.style.display = 'none';
+            loginForm.classList.remove('active-form');
+            registerForm.style.display = 'block';
+            registerForm.classList.add('active-form');
+            authTitle.textContent = '创建账户';
+            authSubtitle.textContent = '加入SeedAI，开始您的种子研究之旅';
+            switchFormText.innerHTML = '已有账户？<a href="#" id="switchToLogin">返回登录</a>';
+
+            // 重新绑定返回登录的事件
+            this.bindSwitchToLogin();
+        } else {
+            registerForm.style.display = 'none';
+            registerForm.classList.remove('active-form');
+            loginForm.style.display = 'block';
+            loginForm.classList.add('active-form');
+            authTitle.textContent = '欢迎回来';
+            authSubtitle.textContent = '登录您的SeedAI账户';
+            switchFormText.innerHTML = '还没有账户？<a href="#" id="switchToRegister">立即注册</a>';
+        }
+
+        this.currentForm = formType;
+    }
+
     async handleLogin(e) {
         e.preventDefault();
 
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
         const rememberMe = document.getElementById('rememberMe').checked;
-        const loginBtn = document.getElementById('loginBtn');
+        const loginBtn = document.querySelector('#loginForm button[type="submit"]');
 
         if (!username || !password) {
             Utils.showMessage('请输入用户名和密码', 'warning');
@@ -192,9 +243,10 @@ class LoginApp {
         }
     }
 
-    togglePasswordVisibility() {
-        const passwordInput = document.getElementById('password');
-        const toggleBtn = document.getElementById('passwordToggle');
+    togglePasswordVisibility(inputId) {
+        const passwordInput = document.getElementById(inputId);
+        const inputGroup = passwordInput.parentNode; // 获取父元素，即.password-input容器
+        const toggleBtn = inputGroup.querySelector('.password-toggle'); // 在父元素中查找toggle按钮
 
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
@@ -203,15 +255,6 @@ class LoginApp {
             passwordInput.type = 'password';
             toggleBtn.textContent = '👁️';
         }
-    }
-
-    showRegisterModal() {
-        document.getElementById('registerModal').style.display = 'flex';
-    }
-
-    hideRegisterModal() {
-        document.getElementById('registerModal').style.display = 'none';
-        document.getElementById('registerForm').reset();
     }
 
     async handleRegister(e) {
@@ -244,7 +287,7 @@ class LoginApp {
             return;
         }
 
-        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const submitBtn = document.querySelector('#registerForm button[type="submit"]');
         Utils.setLoading(submitBtn, true);
 
         try {
@@ -256,11 +299,16 @@ class LoginApp {
 
             if (response.success) {
                 Utils.showMessage('注册成功！请登录', 'success');
-                this.hideRegisterModal();
 
-                // 自动填充登录表单
-                document.getElementById('username').value = username;
-                document.getElementById('password').value = '';
+                // 清空注册表单
+                document.getElementById('registerForm').reset();
+
+                // 延迟后切换回登录表单
+                setTimeout(() => {
+                    this.switchForm('login');
+                    // 自动填充登录表单
+                    document.getElementById('loginUsername').value = username;
+                }, 1000);
             } else {
                 Utils.showMessage(response.message || '注册失败', 'error');
             }
@@ -276,3 +324,115 @@ class LoginApp {
 document.addEventListener('DOMContentLoaded', () => {
     new LoginApp();
 });
+
+// 处理登录
+async function handleLogin(event) {
+    event.preventDefault(); // 阻止表单默认提交行为
+
+    const usernameOrEmail = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
+
+    // 禁用登录按钮，防止重复提交
+    const loginButton = document.getElementById('loginBtn');
+    const originalButtonText = loginButton.innerHTML;
+    loginButton.disabled = true;
+    loginButton.innerHTML = '<span class="btn-icon">⏳</span> 登录中...';
+
+    try {
+        // 发送登录请求
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username_or_email: usernameOrEmail, password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // 存储令牌
+            localStorage.setItem('token', result.data.token);
+            
+            // 显示成功消息
+            showMessage('登录成功！', 'success');
+            
+            // 跳转到首页
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        } else {
+            // 显示错误消息
+            showMessage(result.message || '登录失败', 'error');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showMessage('网络错误，请稍后重试', 'error');
+    } finally {
+        // 恢复登录按钮状态
+        loginButton.disabled = false;
+        loginButton.innerHTML = originalButtonText;
+    }
+}
+
+// 处理注册
+async function handleRegister(event) {
+    event.preventDefault(); // 阻止表单默认提交行为
+
+    // 获取表单数据
+    const username = document.getElementById('regUsername').value;
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPassword').value;
+    const confirmPassword = document.getElementById('regConfirmPassword').value;
+
+    // 验证密码一致性
+    if (password !== confirmPassword) {
+        showMessage('两次输入的密码不一致', 'error');
+        return;
+    }
+
+    // 验证密码强度
+    if (password.length < 6) {
+        showMessage('密码长度至少为6位', 'error');
+        return;
+    }
+
+    // 禁用注册按钮，防止重复提交
+    const registerButton = document.getElementById('registerBtn');
+    const originalButtonText = registerButton.innerHTML;
+    registerButton.disabled = true;
+    registerButton.innerHTML = '<span class="btn-icon">⏳</span> 注册中...';
+
+    try {
+        // 发送注册请求
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+
+        const result = await response.json();
+
+        if (response.status === 201 && result.success) {
+            // 显示成功消息
+            showMessage('注册成功！请登录', 'success');
+            
+            // 注册成功后切换到登录表单
+            setTimeout(() => {
+                switchForm('login');
+            }, 2000);
+        } else {
+            // 显示错误消息
+            showMessage(result.message || '注册失败', 'error');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showMessage('网络错误，请稍后重试', 'error');
+    } finally {
+        // 恢复注册按钮状态
+        registerButton.disabled = false;
+        registerButton.innerHTML = originalButtonText;
+    }
+}
