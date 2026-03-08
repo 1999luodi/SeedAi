@@ -469,7 +469,7 @@ function updateNavDisplay() {
         if (isLoggedIn) {
             // 用户已登录，显示用户名和退出链接
             if(loginLink) loginLink.style.display = 'none';
-            profileLink.style.display = 'block';
+            profileLink.style.display = 'inline-flex';
             
             // 获取用户信息并显示用户名
             getUserInfo().then(userInfo => {
@@ -490,7 +490,7 @@ function updateNavDisplay() {
             }
         } else {
             // 用户未登录，显示登录链接
-            if(loginLink) loginLink.style.display = 'block';
+            if(loginLink) loginLink.style.display = 'inline-flex';
             profileLink.style.display = 'none';
         }
     } else if (loginLink) {

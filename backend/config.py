@@ -18,11 +18,15 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # 确保上传目录存在
-    UPLOAD_FOLDER = os.path.join(basedir, '..', 'uploads')
+    UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    # 数据集原始文件存储目录：backend/datasets/<username>/<dataset_name>_<id>/
+    DATASETS_FOLDER = os.path.join(basedir, 'datasets')
+    os.makedirs(DATASETS_FOLDER, exist_ok=True)
     
-    # 限制上传文件大小 (100MB)
-    MAX_CONTENT_LENGTH = 100 * 1024 * 1024
+    # Align backend request limit with workspace upload policy (<5GB total).
+    MAX_CONTENT_LENGTH = 6 * 1024 * 1024 * 1024
     
     # 允许的文件扩展名
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}

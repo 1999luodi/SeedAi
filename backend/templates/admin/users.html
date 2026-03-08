@@ -5,18 +5,33 @@
 {% block page_title %}用户管理{% endblock %}
 
 {% block content %}
+<style>
+    .users-table .status-col {
+        width: 120px;
+        min-width: 120px;
+    }
+
+    .users-table .status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 82px;
+        white-space: nowrap;
+    }
+</style>
+
 <div class="page-actions">
     <button class="btn btn-primary" onclick="showAddUserModal()">➕ 新增用户</button>
     <button class="btn btn-outline" onclick="refreshUsers()">🔄 刷新列表</button>
 </div>
 
-<table class="data-table">
+<table class="data-table users-table">
     <thead>
         <tr>
             <th>ID</th>
             <th>用户名</th>
             <th>邮箱</th>
-            <th>状态</th>
+            <th class="status-col">状态</th>
             <th>注册时间</th>
             <th>数据集数量</th>
             <th>操作</th>
@@ -28,7 +43,7 @@
             <td>{{ user.id }}</td>
             <td>{{ user.username }}</td>
             <td>{{ user.email }}</td>
-            <td>
+            <td class="status-col">
                 <span class="status-badge status-{{ 'active' if user.is_active else 'inactive' }}">
                     {{ '✅ 正常' if user.is_active else '❌ 禁用' }}
                 </span>

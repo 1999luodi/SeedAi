@@ -40,23 +40,11 @@ CREATE TABLE IF NOT EXISTS images (
     uploaded_by INT NOT NULL,
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     file_path VARCHAR(500) NOT NULL,
-    annotations JSON,  -- 存储标注信息
+    width INT,
+    height INT,
+    annotations_path VARCHAR(500),  -- 存储COCO标注文件路径
     FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE CASCADE,
     FOREIGN KEY (uploaded_by) REFERENCES users(id)
-);
-
--- 创建标注表
-CREATE TABLE IF NOT EXISTS annotations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    image_id INT NOT NULL,
-    label VARCHAR(100) NOT NULL,
-    x_min FLOAT NOT NULL,
-    y_min FLOAT NOT NULL,
-    x_max FLOAT NOT NULL,
-    y_max FLOAT NOT NULL,
-    confidence FLOAT DEFAULT 1.0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
 -- 创建默认用户
@@ -73,4 +61,3 @@ WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user1');
 CREATE INDEX idx_datasets_created_by ON datasets(created_by);
 CREATE INDEX idx_images_dataset_id ON images(dataset_id);
 CREATE INDEX idx_images_uploaded_by ON images(uploaded_by);
-CREATE INDEX idx_annotations_image_id ON annotations(image_id);

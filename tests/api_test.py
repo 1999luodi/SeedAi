@@ -42,7 +42,7 @@ API_ENDPOINTS = load_api_endpoints()
 def test_api_login(username, password):
     """测试登录API"""
     print("Testing login API...")
-    endpoint_info = API_ENDPOINTS.get("用户登录") or API_ENDPOINTS.get("Backend Admin Login")
+    endpoint_info = API_ENDPOINTS.get("用户登录")
     if not endpoint_info:
         # 如果无法从API定义加载，则使用默认值
         endpoint_info = {"method": "POST", "endpoint": "/api/auth/login"}

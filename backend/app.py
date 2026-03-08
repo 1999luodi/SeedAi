@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory, g
+from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory, send_file, g
 from flask_cors import CORS
 from config import Config
 import sys
@@ -7,7 +7,7 @@ import os
 # 添加当前目录到Python路径，确保能导入同目录下的模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models import db, User, Dataset, Image, Annotation
+from models import db, User, Dataset, Image
 from services.user_service import UserService
 from services.dataset_service import DatasetService
 from services.image_service import ImageService
@@ -15,8 +15,10 @@ import os
 import jwt
 from functools import wraps
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import BadRequest
 import logging
 from datetime import datetime, timedelta
+from PIL import Image as PILImage, UnidentifiedImageError
 
 def create_app():
     app = Flask(__name__, template_folder='templates')
@@ -175,14 +177,26 @@ def admin_users(current_user):
 def admin_datasets(current_user):
     if current_user.role < 1:  # 管理员及以上可访问
         return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
-    return render_template('admin/datasets.html', current_user=current_user)
+
+    datasets = Dataset.query.all()
+    for dataset in datasets:
+        dataset.owner_username = dataset.creator.username if dataset.creator else 'Unknown'
+        dataset.image_count = len(dataset.images) if dataset.images is not None else 0
+
+    return render_template('admin/datasets.html', current_user=current_user, datasets=datasets)
 
 @app.route('/backend/admin/images')
 @login_required_html
 def admin_images(current_user):
     if current_user.role < 1:  # 管理员及以上可访问
         return jsonify({'success': False, 'message': 'Insufficient permissions'}), 403
-    return render_template('admin/images.html', current_user=current_user)
+
+    try:
+        images = ImageService.get_all_images()
+        return render_template('admin/images.html', current_user=current_user, images=images)
+    except Exception as e:
+        logger.error(f"Get admin images error: {str(e)}")
+        return render_template('admin/images.html', current_user=current_user, images=[])
 
 @app.route('/backend/admin/stats')
 @login_required_html
@@ -208,18 +222,22 @@ def health():
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     try:
-        data = request.get_json()
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
-        
-        if UserService.register_user(username, email, password):
-            return jsonify({'success': True, 'message': 'User registered successfully'})
-        else:
-            return jsonify({'success': False, 'message': 'Username or email already exists'})
+        data = request.get_json() or {}
+        username = (data.get('username') or '').strip()
+        email = (data.get('email') or '').strip()
+        password = data.get('password') or ''
+
+        if not username or not email or not password:
+            return create_response(False, 'Username, email and password are required', status_code=400)
+
+        UserService.register_user(username, email, password)
+        return create_response(True, 'User registered successfully')
+    except BadRequest as e:
+        # 返回业务可读错误（如用户名或邮箱已存在）
+        return create_response(False, str(e.description or e), status_code=400)
     except Exception as e:
         app.logger.error(f'Register error: {str(e)}')
-        return jsonify({'success': False, 'message': 'Registration failed'})
+        return create_response(False, 'Registration failed', status_code=500)
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -360,10 +378,13 @@ def get_datasets(current_user):
 
 @app.route('/api/datasets/<int:dataset_id>', methods=['GET'])
 @token_required
-def get_dataset(dataset_id):
+def get_dataset(current_user, dataset_id):
     try:
         dataset = DatasetService.get_dataset_by_id(dataset_id)
         if dataset:
+            # 仅创建者、管理员或公开数据集可查看
+            if dataset['created_by'] != current_user.id and not dataset.get('is_public', False) and current_user.role < 1:
+                return create_response(False, "Permission denied", status_code=403)
             return create_response(True, "Dataset retrieved", dataset)
         return create_response(False, "Dataset not found", status_code=404)
     except Exception as e:
@@ -395,14 +416,100 @@ def delete_dataset(current_user, dataset_id):
             return create_response(True, "Dataset deleted")
         else:
             return create_response(False, "Dataset not found or access denied", status_code=403)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
     except Exception as e:
         logger.error(f"Delete dataset error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
+
+@app.route('/api/datasets/<int:dataset_id>/label-categories', methods=['GET'])
+@token_required
+def get_dataset_label_categories(current_user, dataset_id):
+    try:
+        dataset = Dataset.query.get(dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if dataset.created_by != current_user.id and not dataset.is_public and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        categories = DatasetService.get_label_categories(dataset_id)
+        return create_response(True, "Label categories retrieved", {
+            'dataset_id': dataset_id,
+            'categories': categories
+        })
+    except Exception as e:
+        logger.error(f"Get dataset label categories error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/datasets/<int:dataset_id>/label-categories', methods=['POST'])
+@token_required
+def add_dataset_label_category(current_user, dataset_id):
+    try:
+        dataset = Dataset.query.get(dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if dataset.created_by != current_user.id and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        data = request.get_json() or {}
+        name = data.get('name')
+        if not name or not str(name).strip():
+            return create_response(False, "name is required", status_code=400)
+
+        categories = DatasetService.add_label_category(dataset_id, name)
+        return create_response(True, "Label category added", {
+            'dataset_id': dataset_id,
+            'categories': categories
+        }, status_code=201)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
+    except Exception as e:
+        logger.error(f"Add dataset label category error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/datasets/<int:dataset_id>/label-categories', methods=['DELETE'])
+@token_required
+def delete_dataset_label_category(current_user, dataset_id):
+    try:
+        dataset = Dataset.query.get(dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if dataset.created_by != current_user.id and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        data = request.get_json(silent=True) or {}
+        name = data.get('name')
+        if not name or not str(name).strip():
+            return create_response(False, "name is required", status_code=400)
+
+        categories = DatasetService.remove_label_category(dataset_id, name)
+        return create_response(True, "Label category deleted", {
+            'dataset_id': dataset_id,
+            'categories': categories
+        })
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
+    except Exception as e:
+        logger.error(f"Delete dataset label category error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
 @app.route('/api/datasets/<int:dataset_id>/images', methods=['GET'])
 @token_required
-def get_dataset_images(dataset_id):
+def get_dataset_images(current_user, dataset_id):
     try:
+        dataset = Dataset.query.get(dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if dataset.created_by != current_user.id and not dataset.is_public and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
         images = DatasetService.get_images_in_dataset(dataset_id)
         return create_response(True, "Images retrieved", images)
     except Exception as e:
@@ -411,37 +518,60 @@ def get_dataset_images(dataset_id):
 
 @app.route('/api/datasets/<int:dataset_id>/upload', methods=['POST'])
 @token_required
-def upload_image(dataset_id):
+def upload_image(current_user, dataset_id):
     try:
-        current_user = g.current_user
         # 检查数据集是否属于当前用户或公开
-        dataset = DatasetService.get_dataset_by_id(dataset_id)
+        dataset = Dataset.query.get(dataset_id)
         if not dataset or (dataset.created_by != current_user.id and not dataset.is_public):
             return jsonify({'success': False, 'message': 'Access denied'}), 403
 
-        if 'file' not in request.files:
+        if 'file' not in request.files and 'image' not in request.files:
             return jsonify({'success': False, 'message': 'No file part'}), 400
-            
-        file = request.files['file']
+
+        file = request.files.get('file') or request.files.get('image')
         
         if file.filename == '':
             return jsonify({'success': False, 'message': 'No selected file'}), 400
             
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_ext = filename.rsplit('.', 1)[1].lower()
-            unique_filename = f"{dataset_id}_{int(datetime.utcnow().timestamp())}_{filename}"
-            
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            raw_filename = str(file.filename or '').replace('\\', '/')
+            base_filename = os.path.basename(raw_filename)
+            filename = secure_filename(base_filename)
+            timestamp = int(datetime.utcnow().timestamp())
+            unique_filename = f"{timestamp}_{filename}"
+
+            safe_username = secure_filename(current_user.username) or f"user_{current_user.id}"
+            safe_dataset_name = secure_filename(dataset.name) or f"dataset_{dataset.id}"
+            dataset_folder = os.path.join(app.config['DATASETS_FOLDER'], safe_username, f"{safe_dataset_name}_{dataset.id}")
+            os.makedirs(dataset_folder, exist_ok=True)
+
+            file_path = os.path.join(dataset_folder, unique_filename)
             file.save(file_path)
-            
-            image = ImageService.create_image(
-                original_filename=filename,
-                filename=unique_filename,
-                dataset_id=dataset_id,
-                uploaded_by=current_user.id,
-                file_path=file_path
-            )
+
+            try:
+                with PILImage.open(file_path) as uploaded_image:
+                    width, height = uploaded_image.size
+            except (UnidentifiedImageError, OSError):
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return jsonify({'success': False, 'message': 'Failed to read image dimensions'}), 400
+
+            try:
+                image = ImageService.create_image(
+                    original_filename=filename,
+                    filename=unique_filename,
+                    dataset_id=dataset_id,
+                    uploaded_by=current_user.id,
+                    file_path=file_path,
+                    file_size=os.path.getsize(file_path),
+                    width=width,
+                    height=height
+                )
+            except Exception:
+                # Keep filesystem and DB consistent when metadata persistence fails.
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                raise
             
             if image:
                 return jsonify({
@@ -450,6 +580,8 @@ def upload_image(dataset_id):
                     'data': image.to_dict()
                 }), 201
             else:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
                 return jsonify({'success': False, 'message': 'Failed to save image record'}), 500
         else:
             return jsonify({'success': False, 'message': 'File type not allowed'}), 400
@@ -460,7 +592,7 @@ def upload_image(dataset_id):
 # Image routes
 @app.route('/api/images/<int:image_id>', methods=['GET'])
 @token_required
-def get_image(image_id):
+def get_image(current_user, image_id):
     try:
         image = ImageService.get_image_by_id(image_id)
         if image:
@@ -468,6 +600,31 @@ def get_image(image_id):
         return create_response(False, "Image not found", status_code=404)
     except Exception as e:
         logger.error(f"Get image error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/images/<int:image_id>/content', methods=['GET'])
+@token_required
+def get_image_content(current_user, image_id):
+    """按鉴权返回图片二进制内容，供手工标注页加载。"""
+    try:
+        image = Image.query.get(image_id)
+        if not image:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if image.uploaded_by != current_user.id and dataset.created_by != current_user.id and not dataset.is_public:
+            return create_response(False, "Permission denied", status_code=403)
+
+        if not image.file_path or not os.path.exists(image.file_path):
+            return create_response(False, "Image file not found", status_code=404)
+
+        return send_file(image.file_path)
+    except Exception as e:
+        logger.error(f"Get image content error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/images/<int:image_id>', methods=['PUT'])
@@ -507,22 +664,42 @@ def delete_image(current_user, image_id):
         image = Image.query.get(image_id)
         if not image:
             return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
         
         # 检查权限
-        if image.uploaded_by != current_user.id and current_user.role < 2:
+        if image.uploaded_by != current_user.id and dataset.created_by != current_user.id and current_user.role < 2:
             return create_response(False, "Permission denied", status_code=403)
         
         result = ImageService.delete_image_admin(image_id)
         return create_response(True, "Image deleted", result)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
     except Exception as e:
         logger.error(f"Delete image error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/images/<int:image_id>/annotations', methods=['PUT'])
 @token_required
-def update_annotations(image_id):
+def update_annotations(current_user, image_id):
     try:
-        data = request.get_json()
+        image_row = Image.query.get(image_id)
+        if not image_row:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image_row.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if image_row.uploaded_by != current_user.id and dataset.created_by != current_user.id and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        data = request.get_json() or {}
+        if 'annotations' not in data:
+            return create_response(False, "annotations is required", status_code=400)
+
         image = ImageService.update_image_annotations(image_id, data['annotations'])
         return create_response(True, "Annotations updated", image)
     except BadRequest as e:
@@ -534,19 +711,46 @@ def update_annotations(image_id):
 # New annotation routes
 @app.route('/api/images/<int:image_id>/annotations', methods=['GET'])
 @token_required
-def get_annotations(image_id):
+def get_annotations(current_user, image_id):
     try:
+        image_row = Image.query.get(image_id)
+        if not image_row:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image_row.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if image_row.uploaded_by != current_user.id and dataset.created_by != current_user.id and not dataset.is_public and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
         annotations = ImageService.get_annotations_by_image(image_id)
-        return create_response(True, "Annotations retrieved", annotations)
+        return create_response(True, "Annotation file retrieved", annotations)
     except Exception as e:
         logger.error(f"Get annotations error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/images/<int:image_id>/annotations', methods=['POST'])
 @token_required
-def add_annotation(image_id):
+def add_annotation(current_user, image_id):
     try:
-        data = request.get_json()
+        image_row = Image.query.get(image_id)
+        if not image_row:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image_row.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if image_row.uploaded_by != current_user.id and dataset.created_by != current_user.id and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        data = request.get_json() or {}
+        required_fields = ['label', 'x_min', 'y_min', 'x_max', 'y_max']
+        missing = [field for field in required_fields if field not in data]
+        if missing:
+            return create_response(False, f"Missing fields: {', '.join(missing)}", status_code=400)
+
         annotation = ImageService.add_annotation(
             image_id=image_id,
             label=data['label'],
@@ -563,29 +767,38 @@ def add_annotation(image_id):
         logger.error(f"Add annotation error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
-@app.route('/api/annotations/<int:annotation_id>', methods=['PUT'])
-@token_required
-def update_annotation(annotation_id):
-    try:
-        data = request.get_json()
-        annotation = ImageService.update_annotation(annotation_id, **data)
-        return create_response(True, "Annotation updated", annotation)
-    except BadRequest as e:
-        return create_response(False, str(e), status_code=400)
-    except Exception as e:
-        logger.error(f"Update annotation error: {str(e)}")
-        return create_response(False, "Internal server error", status_code=500)
 
-@app.route('/api/annotations/<int:annotation_id>', methods=['DELETE'])
+@app.route('/api/images/<int:image_id>/label-file', methods=['POST'])
 @token_required
-def delete_annotation(annotation_id):
+def save_image_label_file(current_user, image_id):
+    """将当前图片标注导出为COCO文件并写入 images.annotations_path。"""
     try:
-        ImageService.delete_annotation(annotation_id)
-        return create_response(True, "Annotation deleted")
+        image_row = Image.query.get(image_id)
+        if not image_row:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image_row.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        # 仅上传者、数据集创建者或管理员可写标签文件。
+        if image_row.uploaded_by != current_user.id and dataset.created_by != current_user.id and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        data = request.get_json(silent=True) or {}
+        classes = data.get('classes', [])
+        annotations = data.get('annotations')
+        if classes is not None and not isinstance(classes, list):
+            return create_response(False, "classes must be a list", status_code=400)
+        if annotations is not None and not isinstance(annotations, list):
+            return create_response(False, "annotations must be a list", status_code=400)
+
+        result = ImageService.save_label_file(image_id, classes=classes, annotations=annotations)
+        return create_response(True, "Label file saved", result)
     except BadRequest as e:
         return create_response(False, str(e), status_code=400)
     except Exception as e:
-        logger.error(f"Delete annotation error: {str(e)}")
+        logger.error(f"Save image label file error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
 def allowed_file(filename):
@@ -601,11 +814,10 @@ def admin_dashboard(current_user):
     
     try:
         stats = {
-            'total_users': UserService.get_total_count(),
-            'total_datasets': DatasetService.get_total_count(),
-            'total_images': ImageService.get_total_count(),
-            'recent_users': [user.to_admin_dict() for user in UserService.get_recent_users(5)],
-            'recent_datasets': [ds.to_admin_dict() for ds in DatasetService.get_recent_datasets(5)]
+            'total_users': UserService.get_user_count(),
+            'total_datasets': DatasetService.get_dataset_count(),
+            'total_images': ImageService.get_image_count(),
+            'public_datasets': DatasetService.get_public_dataset_count()
         }
         return render_template('admin/dashboard.html', stats=stats, current_user=current_user)
     except Exception as e:
@@ -627,11 +839,13 @@ def admin_users_page(current_user):
 def admin_datasets_page(current_user):
     if current_user.role < 2:  # 超级管理员才能访问
         return jsonify({'success': False, 'message': 'Access denied'}), 403
-    
-    datasets = DatasetService.get_all_datasets()
-    return render_template('admin/datasets.html', 
-                          datasets=[ds.to_admin_dict() for ds in datasets], 
-                          current_user=current_user)
+
+    datasets = Dataset.query.all()
+    for dataset in datasets:
+        dataset.owner_username = dataset.creator.username if dataset.creator else 'Unknown'
+        dataset.image_count = len(dataset.images) if dataset.images is not None else 0
+
+    return render_template('admin/datasets.html', datasets=datasets, current_user=current_user)
 
 @app.route('/admin/images')
 @login_required_html
@@ -667,14 +881,27 @@ def admin_stats_page(current_user):
         return render_template('admin/stats.html', stats={})
 
 # API routes for admin operations
+@app.route('/api/admin/users', methods=['GET'])
+@token_required
+def get_admin_users(current_user):
+    """获取用户列表（管理员）"""
+    try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+
+        users = UserService.get_all_users()
+        return create_response(True, "Users retrieved", users)
+    except Exception as e:
+        logger.error(f"Get admin users error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
 @app.route('/api/admin/users/<int:user_id>/toggle-status', methods=['POST'])
 @token_required
-def toggle_user_status(user_id):
+def toggle_user_status(current_user, user_id):
     """切换用户状态（需要管理员权限）"""
     try:
         # 检查当前用户是否为管理员或超级管理员
-        current_user = UserService.get_user_by_id(request.user_id)
-        if not current_user or current_user['role'] < 1:
+        if current_user.role < 1:
             return create_response(False, "Insufficient permissions", status_code=403)
         
         user = UserService.toggle_user_status(user_id)
@@ -685,9 +912,11 @@ def toggle_user_status(user_id):
 
 @app.route('/api/admin/datasets/<int:dataset_id>/toggle-public', methods=['POST'])
 @token_required
-def toggle_dataset_public(dataset_id):
+def toggle_dataset_public(current_user, dataset_id):
     """切换数据集公开状态"""
     try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
         dataset = DatasetService.toggle_dataset_public(dataset_id)
         return create_response(True, "Dataset visibility updated", dataset)
     except Exception as e:
@@ -696,10 +925,12 @@ def toggle_dataset_public(dataset_id):
 
 @app.route('/api/admin/images/<int:image_id>/delete', methods=['DELETE'])
 @token_required
-def delete_image_admin(image_id):
+def delete_image_admin(current_user, image_id):
     """删除图片（管理员）"""
     try:
-        result = ImageService.delete_image(image_id)
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+        result = ImageService.delete_image_admin(image_id)
         return create_response(True, "Image deleted", result)
     except Exception as e:
         logger.error(f"Delete image error: {str(e)}")
@@ -707,12 +938,12 @@ def delete_image_admin(image_id):
 
 # User management API routes (增删改查)
 @app.route('/api/admin/users/<int:user_id>', methods=['GET'])
-def get_user_admin(user_id):
+@token_required
+def get_user_admin(current_user, user_id):
     """获取用户详情（管理员）"""
     try:
         # 检查当前用户是否为管理员或超级管理员
-        current_user = UserService.get_user_by_id(request.user_id)
-        if not current_user or current_user['role'] < 1:
+        if current_user.role < 1:
             return create_response(False, "Insufficient permissions", status_code=403)
         
         user = UserService.get_user_by_id(user_id)
@@ -724,12 +955,12 @@ def get_user_admin(user_id):
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
-def update_user_admin(user_id):
+@token_required
+def update_user_admin(current_user, user_id):
     """更新用户信息（管理员）"""
     try:
         # 检查当前用户是否为管理员或超级管理员
-        current_user = UserService.get_user_by_id(request.user_id)
-        if not current_user or current_user['role'] < 1:
+        if current_user.role < 1:
             return create_response(False, "Insufficient permissions", status_code=403)
         
         data = request.get_json()
@@ -749,16 +980,16 @@ def update_user_admin(user_id):
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
-def delete_user_admin(user_id):
+@token_required
+def delete_user_admin(current_user, user_id):
     """删除用户（管理员）"""
     try:
         # 检查当前用户是否为管理员或超级管理员
-        current_user = UserService.get_user_by_id(request.user_id)
-        if not current_user or current_user['role'] < 1:
+        if current_user.role < 1:
             return create_response(False, "Insufficient permissions", status_code=403)
         
         # 防止删除自己
-        if hasattr(request, 'user_id') and request.user_id == user_id:
+        if current_user.id == user_id:
             return create_response(False, "Cannot delete yourself", status_code=400)
         
         UserService.delete_user(user_id)
@@ -850,8 +1081,8 @@ def api_endpoints():
         "数据标注": [
             {"method": "GET", "path": "/api/images/{id}/annotations", "description": "查看图片标注"},
             {"method": "POST", "path": "/api/images/{id}/annotations", "description": "添加标注"},
-            {"method": "PUT", "path": "/api/annotations/{id}", "description": "修改标注"},
-            {"method": "DELETE", "path": "/api/annotations/{id}", "description": "删除标注"}
+            {"method": "PUT", "path": "/api/images/{id}/annotations", "description": "覆盖图片标注"},
+            {"method": "POST", "path": "/api/images/{id}/label-file", "description": "生成COCO标注文件并记录路径"}
         ],
         "AI推理": [
             {"method": "POST", "path": "/api/ai/inference", "description": "AI推理接口，接收图片返回标注结果"}

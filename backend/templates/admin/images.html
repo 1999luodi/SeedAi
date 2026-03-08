@@ -29,9 +29,9 @@
             <td>{{ image.filename }}</td>
             <td>{{ image.dataset_name or '未知' }}</td>
             <td>{{ image.uploader_username or '未知' }}</td>
-            <td>{{ (image.file_size / 1024)|round(1) }} KB</td>
+            <td>{{ ((image.file_size or 0) / 1024)|round(1) }} KB</td>
             <td>{{ image.annotation_count or 0 }}</td>
-            <td>{{ image.created_at.strftime('%Y-%m-%d %H:%M') if image.created_at else '-' }}</td>
+            <td>{{ image.created_at if image.created_at else '-' }}</td>
             <td>
                 <button class="action-btn btn-outline" onclick="viewImage({{ image.id }})">查看</button>
                 <button class="action-btn btn-danger" onclick="deleteImage({{ image.id }})">删除</button>

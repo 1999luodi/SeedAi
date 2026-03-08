@@ -19,9 +19,9 @@ services:
     container_name: seedai-backend-1
     working_dir: /app
     volumes:
-      - D:/ai-projects/SeedAi/backend:/app
-      - D:/ai-projects/SeedAi/uploads:/app/uploads
-      - D:/ai-projects/SeedAi/datasets:/app/datasets
+      - ./backend:/app
+      - ./data/uploads:/app/uploads
+      - ./data/datasets:/app/datasets
     ports:
       - "5000:5000"
     environment:
@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: seedai-ai_worker-1
     volumes:
-      - D:/ai-projects/SeedAi/pytorch_model:/workspace
+      - ./pytorch_model:/workspace
     
     depends_on:
       - backend
@@ -51,9 +51,9 @@ services:
     ports:
       - "80:80"
     volumes:
-      - D:/ai-projects/SeedAi/frontend:/usr/share/nginx/html
-      - D:/ai-projects/SeedAi/tests:/usr/share/nginx/html/tests
-      - D:/ai-projects/SeedAi/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend:/usr/share/nginx/html
+      - ./tests:/usr/share/nginx/html/tests
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend
     restart: unless-stopped

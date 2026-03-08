@@ -12,17 +12,15 @@ import bcrypt
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app import app, db
+from app import app
 from models import User
 from services.user_service import UserService
 
 
 def create_tables():
     """创建数据库表结构"""
-    with app.app_context():
-        # 创建所有表
-        db.create_all()
-        print("✓ 数据库表结构创建成功")
+    print("[DEPRECATED] 请使用 mysql_data/migrate.py 进行建表和改表。")
+    print("示例: python mysql_data/migrate.py --all")
 
 
 def insert_initial_data():
@@ -55,7 +53,7 @@ def verify_tables():
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         
-        expected_tables = ['users', 'datasets', 'images', 'annotations']
+        expected_tables = ['users', 'datasets', 'images', 'annotations', 'dataset_label_categories']
         existing_tables = inspector.get_table_names()
         
         print("数据库表验证:")

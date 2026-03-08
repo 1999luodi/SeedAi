@@ -19,6 +19,13 @@ SeedAI 提供了一个完整的API测试工具，用于测试后端API接口的�
 - 所有接口定义都从后端的[api_endpoints.json](file://d:\ai-projects\SeedAi\backend\api_endpoints.json)文件动态加载
 - 修改接口定义只需更新后端的api_endpoints.json文件
 - 保持接口定义的单一数据源，确保API测试页面始终反映最新的接口定义
+- Python测试客户端使用 `tests/utils/api_contract.py`（由后端定义自动生成）
+
+### 契约同步步骤
+
+1. 修改 `backend/api_endpoints.json`
+2. 执行 `python backend/sync_api_contract.py`
+3. 再运行前端/测试，确保都基于同一份接口契约
 
 ## 默认测试账户
 

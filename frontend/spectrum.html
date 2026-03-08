@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>光谱分析 - SeedAI</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260308ab">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
 </head>
 <body>
@@ -148,7 +148,7 @@
             if (isLoggedIn) {
                 // 用户已登录，显示用户名和退出链接
                 loginLink.style.display = 'none';
-                profileLink.style.display = 'block';
+                profileLink.style.display = 'inline-flex';
                 
                 // 获取用户信息并显示用户名
                 fetch('/api/users/profile', {
@@ -174,7 +174,7 @@
             } else {
                 // 用户未登录，跳转到登录页面
                 // 注意：这里我们不再强制跳转，而是显示登录链接
-                loginLink.style.display = 'block';
+                loginLink.style.display = 'inline-flex';
                 profileLink.style.display = 'none';
             }
             

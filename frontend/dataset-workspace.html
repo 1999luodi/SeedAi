@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据集操作 - SeedAI</title>
+    <link rel="stylesheet" href="style.css?v=20260309aj">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🌱 SeedAI</h1>
+                    <span class="subtitle">AI图像标注平台</span>
+                </div>
+                <nav class="nav">
+                    <ul>
+                        <li><a href="index.html">首页</a></li>
+                        <li><a href="spectrum.html">光谱分析</a></li>
+                        <li><a href="detection.html">AI检测</a></li>
+                        <li><a href="dataset.html" class="active">数据集</a></li>
+                        <li><a href="annotate.html">手工标注</a></li>
+                        <li><a href="javascript:void(0)" id="profileLink" style="display:none;">
+                            <span id="usernameDisplay"></span>
+                            <span id="logoutLink" style="cursor:pointer;margin-left:10px;">退出</span>
+                        </a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <section class="ws-top">
+                <div class="ws-info-block">
+                    <h2 id="wsDatasetTitle">数据集操作</h2>
+                    <p id="wsDatasetMeta">加载中...</p>
+
+                    <div class="ws-visibility-row">
+                        <label for="wsVisibilitySelect">数据集选择</label>
+                        <select id="wsVisibilitySelect" class="btn btn-secondary" aria-label="数据集可见性">
+                            <option value="private">私密</option>
+                            <option value="public">公开</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="ws-actions-block">
+                    <button id="wsToAnnotateBtn" class="btn btn-primary">进入标注</button>
+                    <button id="wsBackBtn" class="btn btn-secondary">返回数据集列表</button>
+                </div>
+            </section>
+
+            <section class="dm-detail-view ws-main-area">
+                <div class="ws-main-grid">
+                    <div class="dm-files-panel">
+                        <h4>上传文件</h4>
+                        <p class="dm-note">支持拖拽、选择文件、选择目录。限制: 最多1000个文件，单次总大小小于5GB。</p>
+                        <div id="wsDropZone" class="dm-drop-zone">
+                            <p>拖动文件到此区域</p>
+                            <p>或使用下方按钮选择</p>
+                        </div>
+                        <div class="dm-upload-actions">
+                            <button id="wsPickFilesBtn" class="btn btn-secondary" type="button">选择文件</button>
+                            <button id="wsPickFolderBtn" class="btn btn-secondary" type="button">选择目录</button>
+                            <button id="wsClearBtn" class="btn btn-secondary" type="button">清空</button>
+                            <button id="wsStartUploadBtn" class="btn btn-primary" type="button">开始上传</button>
+                        </div>
+                        <input id="wsFileInput" type="file" multiple style="display:none;">
+                        <input id="wsFolderInput" type="file" webkitdirectory directory multiple style="display:none;">
+                        <div id="wsUploadSummary" class="ws-summary"></div>
+                        <div id="wsUploadList" class="dm-upload-list"></div>
+                    </div>
+                    <div class="dm-anno-panel">
+                        <h4>文件列表</h4>
+                        <div id="wsFileList" class="dm-scroll"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="js/api-contract.js?v=20260308e"></script>
+    <script src="js/shared.js?v=20260308e"></script>
+    <script src="js/dataset-workspace.js?v=20260309d"></script>
+</body>
+</html>

@@ -66,7 +66,7 @@ def verify_initial_data():
             # 切换到ai_dataset数据库
             cursor.execute("USE ai_dataset;")
             
-            expected_tables = ['users', 'datasets', 'images', 'annotations']
+            expected_tables = ['users', 'datasets', 'images']
             
             for table in expected_tables:
                 cursor.execute(f"SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'ai_dataset' AND table_name = '{table}';")

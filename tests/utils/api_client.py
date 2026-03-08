@@ -7,6 +7,8 @@ import requests
 import json
 from typing import Dict, Optional, Any
 
+from .api_contract import API_ROUTES, build_route
+
 class APIClient:
     """SeedAI API客户端"""
     
@@ -40,7 +42,7 @@ class APIClient:
     
     def register(self, username: str, email: str, password: str) -> Dict[str, Any]:
         """用户注册"""
-        response = self._request('POST', '/api/auth/register', {
+        response = self._request('POST', API_ROUTES['POST_API_AUTH_REGISTER'], {
             'username': username,
             'email': email,
             'password': password
@@ -53,7 +55,7 @@ class APIClient:
     
     def login(self, username_or_email: str, password: str) -> Dict[str, Any]:
         """用户登录"""
-        response = self._request('POST', '/api/auth/login', {
+        response = self._request('POST', API_ROUTES['POST_API_AUTH_LOGIN'], {
             'username_or_email': username_or_email,
             'password': password
         })
@@ -68,7 +70,7 @@ class APIClient:
     
     def get_health(self) -> Dict[str, Any]:
         """获取后端健康状态"""
-        response = self._request('GET', '/health')
+        response = self._request('GET', API_ROUTES['GET_HEALTH'])
         return response.json()
     
     def get_users_admin(self) -> requests.Response:
@@ -81,12 +83,13 @@ class APIClient:
     
     def toggle_user_status(self, user_id: int) -> Dict[str, Any]:
         """切换用户状态"""
-        response = self._request('POST', f'/api/admin/users/{user_id}/toggle-status')
+        endpoint = build_route('POST_API_ADMIN_USERS_BY_USER_ID_TOGGLE_STATUS', user_id=user_id)
+        response = self._request('POST', endpoint)
         return response.json()
     
     def get_profile(self) -> Dict[str, Any]:
         """获取当前用户信息"""
-        response = self._request('GET', '/api/users/profile')
+        response = self._request('GET', API_ROUTES['GET_API_USERS_PROFILE'])
         return response.json()
     
     def clear_token(self):

@@ -3,5 +3,21 @@
     "terminal.integrated.automationProfile.windows": {},
     "files.associations": {
         "**/*.html": "html"
-    }
+    },
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "seedAi",
+            "database": "ai_dataset",
+            "username": "root"
+        }
+    ]
 }

@@ -115,8 +115,33 @@
           "name": "删除数据集",
           "method": "DELETE",
           "endpoint": "/api/datasets/{dataset_id}",
-          "description": "删除指定数据集",
+          "description": "删除指定数据集，并清理该数据集下的图片记录、标注文件、类别配置及对应数据库记录",
           "example": {}
+        },
+        {
+          "name": "获取标签类别",
+          "method": "GET",
+          "endpoint": "/api/datasets/{dataset_id}/label-categories",
+          "description": "获取数据集的标签类别列表",
+          "example": {}
+        },
+        {
+          "name": "新增标签类别",
+          "method": "POST",
+          "endpoint": "/api/datasets/{dataset_id}/label-categories",
+          "description": "为数据集新增一个标签类别",
+          "example": {
+            "name": "seed"
+          }
+        },
+        {
+          "name": "删除标签类别",
+          "method": "DELETE",
+          "endpoint": "/api/datasets/{dataset_id}/label-categories",
+          "description": "删除数据集中的指定标签类别",
+          "example": {
+            "name": "seed"
+          }
         }
       ]
     },
@@ -137,6 +162,35 @@
           "endpoint": "/api/images/{image_id}",
           "description": "获取指定图片的详细信息",
           "example": {}
+        },
+        {
+          "name": "获取图片标注",
+          "method": "GET",
+          "endpoint": "/api/images/{image_id}/annotations",
+          "description": "读取图片对应的标注文件（COCO），返回标注内容和文件路径",
+          "example": {}
+        },
+        {
+          "name": "保存标签文件",
+          "method": "POST",
+          "endpoint": "/api/images/{image_id}/label-file",
+          "description": "前端完成标注的新增/修改/删除后，仅在数据有变更时提交最终结果，导出为COCO文件并覆盖保存，同时将文件路径写入images.annotations_path",
+          "example": {
+            "annotations": [
+              {
+                "label": "seed",
+                "x_min": 0.1,
+                "y_min": 0.1,
+                "x_max": 0.5,
+                "y_max": 0.5,
+                "confidence": 1
+              }
+            ],
+            "classes": [
+              "seed",
+              "root"
+            ]
+          }
         }
       ]
     },
@@ -156,6 +210,13 @@
           "method": "GET",
           "endpoint": "/api/endpoints",
           "description": "获取所有API端点的定义",
+          "example": {}
+        },
+        {
+          "name": "统计信息",
+          "method": "GET",
+          "endpoint": "/api/stats",
+          "description": "获取首页统计信息",
           "example": {}
         }
       ]

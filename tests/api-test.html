@@ -33,6 +33,7 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            min-height: 0;
         }
 
         .request-panel, .response-panel {
@@ -43,6 +44,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            flex: 1;
+            min-height: 0;
         }
 
         .panel-title {
@@ -57,6 +60,9 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            overflow-y: auto;
+            min-height: 0;
+            padding-right: 4px;
         }
 
         .form-group {
@@ -69,6 +75,11 @@
             font-weight: 600;
             font-size: 0.9em;
             color: #555;
+        }
+
+        .field-hint {
+            font-size: 0.85em;
+            color: #666;
         }
 
         .form-group input, .form-group select, .form-group textarea {
@@ -99,6 +110,26 @@
 
         .btn-send:hover {
             background: #1976D2;
+        }
+
+        .btn-secondary {
+            background: #607D8B;
+            margin-top: 0;
+        }
+
+        .btn-secondary:hover {
+            background: #546E7A;
+        }
+
+        .inline-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .inline-actions button {
+            margin-top: 0;
+            white-space: nowrap;
         }
 
         .response-output {
@@ -155,13 +186,6 @@
         .PUT { background: #FF9800; }
         .DELETE { background: #F44336; }
 
-        .preset-section {
-            padding: 8px 15px 8px 25px;
-            border-bottom: 1px solid #f0f0f0;
-            font-weight: bold;
-            background: #fafafa;
-        }
-
         .collapsible {
             cursor: pointer;
         }
@@ -189,10 +213,20 @@
                 <div class="panel-title">API 请求</div>
                 <div class="request-form">
                     <div class="form-group">
-                        <label for="preset-select">选择预设接口</label>
-                        <select id="preset-select" onchange="loadPreset()">
-                            <option value="">请选择...</option>
-                        </select>
+                        <label for="token-header-name">Token Header (可选)</label>
+                        <div class="inline-actions">
+                            <input type="text" id="token-header-name" placeholder="Header 名称，例如 Authorization">
+                            <input type="text" id="token-header-value" list="token-history-list" placeholder="Header 值，例如 eyJ... 或 Bearer eyJ...">
+                            <datalist id="token-history-list"></datalist>
+                            <button type="button" class="btn-secondary" onclick="applyTokenHeaderToEditor()">写入请求头(JSON)</button>
+                        </div>
+                        <div class="inline-actions">
+                            <label style="font-weight: 400; font-size: 0.85em; color: #666; cursor: pointer;">
+                                <input type="checkbox" id="jwt-auto-bearer" checked>
+                                JWT 自动补 Bearer（可直接粘贴纯 JWT）
+                            </label>
+                        </div>
+                        <div class="field-hint">将 token 的名称和值写在这里，例如: Authorization + JWT。</div>
                     </div>
                     <div class="form-group">
                         <label for="api-method">方法</label>
@@ -208,8 +242,14 @@
                         <input type="text" id="api-url" placeholder="输入API端点URL">
                     </div>
                     <div class="form-group">
+                        <label for="request-headers">请求头 (JSON)</label>
+                        <textarea id="request-headers" rows="5" placeholder='例如: {"Content-Type":"application/json","Authorization":"Bearer <token>"}'></textarea>
+                        <div class="field-hint">你可以在这里手动输入 Authorization。</div>
+                    </div>
+                    <div class="form-group">
                         <label for="request-body">请求体 (JSON)</label>
                         <textarea id="request-body" rows="6" placeholder='输入JSON格式的请求体，例如: {"key": "value"}'></textarea>
+                        <div class="field-hint" id="body-format-hint">标准格式: {}</div>
                     </div>
                     <button class="btn-send" onclick="sendRequest()">发送请求</button>
                 </div>
@@ -224,18 +264,23 @@
 
     <script>
         let endpointsData = null;
+        const TOKEN_HEADER_NAME_STORAGE_KEY = 'seedai.apiTest.tokenHeaderName';
+        const TOKEN_STORAGE_KEY = 'seedai.apiTest.token';
+        const TOKEN_HISTORY_KEY = 'seedai.apiTest.tokenHistory';
+        const TOKEN_RAW_JWT_MODE_KEY = 'seedai.apiTest.rawJwtMode';
         
         // 页面加载完成后获取API端点定义
         document.addEventListener('DOMContentLoaded', async function() {
             try {
+                restoreSavedToken();
+                renderTokenSuggestions();
+                initializeRequestDefaults();
+                document.getElementById('api-method').addEventListener('change', applyBodyTemplateByMethod);
                 const response = await fetch('/backend/api_endpoints.json');
                 endpointsData = await response.json();
                 
                 // 构建菜单
                 buildMenu();
-                
-                // 填充预设选择框
-                populatePresets();
             } catch (error) {
                 console.error('获取API端点定义失败:', error);
                 document.getElementById('response-output').textContent = '获取API端点定义失败: ' + error.message;
@@ -280,36 +325,6 @@
             submenu.classList.toggle('hidden');
         }
         
-        // 填充预设选择框
-        function populatePresets() {
-            const presetSelect = document.getElementById('preset-select');
-            
-            endpointsData.categories.forEach(category => {
-                const group = document.createElement('optgroup');
-                group.label = category.name;
-                
-                category.endpoints.forEach(endpoint => {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify(endpoint);
-                    option.textContent = `${endpoint.name} (${endpoint.method} ${endpoint.endpoint})`;
-                    group.appendChild(option);
-                });
-                
-                presetSelect.appendChild(group);
-            });
-        }
-        
-        // 加载预设
-        function loadPreset() {
-            const presetSelect = document.getElementById('preset-select');
-            const selectedValue = presetSelect.value;
-            
-            if (!selectedValue) return;
-            
-            const endpoint = JSON.parse(selectedValue);
-            loadEndpointDetails(endpoint);
-        }
-        
         // 加载端点详细信息到表单
         function loadEndpointDetails(endpoint) {
             document.getElementById('api-method').value = endpoint.method;
@@ -320,6 +335,139 @@
             } else {
                 document.getElementById('request-body').value = '';
             }
+
+            applyBodyTemplateByMethod();
+        }
+
+        function initializeRequestDefaults() {
+            document.getElementById('request-headers').value = JSON.stringify({
+                "Content-Type": "application/json"
+            }, null, 2);
+            applyBodyTemplateByMethod();
+        }
+
+        function applyBodyTemplateByMethod() {
+            const method = document.getElementById('api-method').value;
+            const bodyInput = document.getElementById('request-body');
+            const hint = document.getElementById('body-format-hint');
+
+            if (method === 'GET') {
+                hint.textContent = '标准格式: GET 通常不需要请求体';
+                return;
+            }
+
+            if (method === 'DELETE') {
+                hint.textContent = '标准格式(可选): {"id": 1}';
+            } else {
+                hint.textContent = '标准格式: {"key": "value"}';
+            }
+
+            if (!bodyInput.value.trim()) {
+                bodyInput.value = JSON.stringify({
+                    key: "value"
+                }, null, 2);
+            }
+        }
+
+        function restoreSavedToken() {
+            const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+            const savedHeaderName = localStorage.getItem(TOKEN_HEADER_NAME_STORAGE_KEY) || 'Authorization';
+            const savedRawJwtMode = localStorage.getItem(TOKEN_RAW_JWT_MODE_KEY);
+            document.getElementById('token-header-name').value = savedHeaderName;
+            document.getElementById('jwt-auto-bearer').checked = savedRawJwtMode !== 'false';
+            if (savedToken) {
+                document.getElementById('token-header-value').value = savedToken;
+            }
+        }
+
+        function getTokenHistory() {
+            try {
+                const raw = localStorage.getItem(TOKEN_HISTORY_KEY);
+                if (!raw) {
+                    return [];
+                }
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveTokenHistory(token) {
+            const history = getTokenHistory().filter(item => item !== token);
+            history.unshift(token);
+            const latest = history.slice(0, 5);
+            localStorage.setItem(TOKEN_HISTORY_KEY, JSON.stringify(latest));
+            renderTokenSuggestions();
+        }
+
+        function renderTokenSuggestions() {
+            const list = document.getElementById('token-history-list');
+            if (!list) {
+                return;
+            }
+            const history = getTokenHistory();
+            list.innerHTML = history.map(token => `<option value="${token}"></option>`).join('');
+        }
+
+        function setTokenValue(token) {
+            const tokenInput = document.getElementById('token-header-value');
+            tokenInput.value = token;
+            localStorage.setItem(TOKEN_STORAGE_KEY, token);
+            saveTokenHistory(token);
+        }
+
+        function setTokenHeaderName(name) {
+            localStorage.setItem(TOKEN_HEADER_NAME_STORAGE_KEY, name);
+        }
+
+        function setRawJwtMode(enabled) {
+            localStorage.setItem(TOKEN_RAW_JWT_MODE_KEY, enabled ? 'true' : 'false');
+        }
+
+        function normalizeHeaderValue(headerName, headerValue) {
+            const useRawJwtMode = document.getElementById('jwt-auto-bearer').checked;
+            if (!useRawJwtMode) {
+                return headerValue;
+            }
+            if (!/^authorization$/i.test(headerName)) {
+                return headerValue;
+            }
+            if (/^bearer\s+/i.test(headerValue)) {
+                return headerValue;
+            }
+            return `Bearer ${headerValue}`;
+        }
+
+        function applyTokenHeaderToEditor() {
+            const headerName = document.getElementById('token-header-name').value.trim();
+            const rawHeaderValue = document.getElementById('token-header-value').value.trim();
+
+            if (!headerName || !rawHeaderValue) {
+                alert('请先输入 Header 名称和值');
+                return;
+            }
+
+            const headerValue = normalizeHeaderValue(headerName, rawHeaderValue);
+
+            const requestHeaders = document.getElementById('request-headers').value.trim();
+            let headers = {};
+            if (requestHeaders) {
+                try {
+                    headers = JSON.parse(requestHeaders);
+                } catch (e) {
+                    alert('请求头JSON格式错误: ' + e.message);
+                    return;
+                }
+            }
+
+            headers[headerName] = headerValue;
+            document.getElementById('request-headers').value = JSON.stringify(headers, null, 2);
+
+            setTokenHeaderName(headerName);
+            setRawJwtMode(document.getElementById('jwt-auto-bearer').checked);
+            setTokenValue(rawHeaderValue);
+            document.getElementById('response-output').textContent = `已写入请求头: ${headerName}: ${headerValue}`;
         }
         
         // 发送API请求
@@ -327,6 +475,9 @@
             const method = document.getElementById('api-method').value;
             const url = document.getElementById('api-url').value;
             const requestBody = document.getElementById('request-body').value.trim();
+            const requestHeaders = document.getElementById('request-headers').value.trim();
+            const tokenHeaderName = document.getElementById('token-header-name').value.trim();
+            const rawTokenHeaderValue = document.getElementById('token-header-value').value.trim();
             
             let body = null;
             if (method !== 'GET' && requestBody) {
@@ -337,13 +488,38 @@
                     return;
                 }
             }
+
+            let headers = {};
+            if (requestHeaders) {
+                try {
+                    headers = JSON.parse(requestHeaders);
+                } catch (e) {
+                    alert('请求头JSON格式错误: ' + e.message);
+                    return;
+                }
+            }
             
             try {
+                if (method !== 'GET' && !headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+
+                const tokenHeaderValue = normalizeHeaderValue(tokenHeaderName, rawTokenHeaderValue);
+                if (tokenHeaderName && tokenHeaderValue && !headers[tokenHeaderName]) {
+                    headers[tokenHeaderName] = tokenHeaderValue;
+                }
+
+                if (tokenHeaderName) {
+                    setTokenHeaderName(tokenHeaderName);
+                }
+                setRawJwtMode(document.getElementById('jwt-auto-bearer').checked);
+                if (rawTokenHeaderValue) {
+                    setTokenValue(rawTokenHeaderValue);
+                }
+
                 const response = await fetch(url, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers,
                     body: body ? JSON.stringify(body) : undefined
                 });
                 
@@ -351,11 +527,21 @@
                 
                 // 格式化响应内容
                 let formattedResponse;
+                let parsedJson = null;
                 try {
-                    const jsonRes = JSON.parse(responseBody);
-                    formattedResponse = JSON.stringify(jsonRes, null, 2);
+                    parsedJson = JSON.parse(responseBody);
+                    formattedResponse = JSON.stringify(parsedJson, null, 2);
                 } catch (e) {
                     formattedResponse = responseBody;
+                }
+
+                const isLoginRequest = /\/api\/auth\/login\/?$/i.test(url);
+                if (isLoginRequest && parsedJson && parsedJson.success && parsedJson.data && parsedJson.data.token) {
+                    document.getElementById('token-header-name').value = 'Authorization';
+                    document.getElementById('jwt-auto-bearer').checked = true;
+                    setTokenHeaderName('Authorization');
+                    setRawJwtMode(true);
+                    setTokenValue(parsedJson.data.token);
                 }
                 
                 document.getElementById('response-output').textContent = 

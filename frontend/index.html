@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SeedAI - AI图像标注平台</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260308ab">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
 </head>
 <body>
@@ -20,9 +20,13 @@
                         <li><a href="index.html" class="active">首页</a></li>
                         <li><a href="spectrum.html">光谱分析</a></li>
                         <li><a href="detection.html">AI检测</a></li>
-                        <li><a href="dataset.html">数据集管理</a></li>
+                        <li><a href="dataset.html">数据集</a></li>
                         <li><a href="annotate.html">手工标注</a></li>
-                        <li><a href="login.html" id="loginLink">登录/注册</a></li>
+                        <li><a href="javascript:void(0)" id="profileLink" style="display:none;">
+                            <span id="usernameDisplay"></span>
+                            <span id="logoutLink" style="cursor:pointer;margin-left:10px;">退出</span>
+                        </a></li>
+                        <li><a href="login.html" id="loginLink">登录</a></li>
                     </ul>
                 </nav>
             </div>
@@ -128,24 +132,55 @@
     </footer>
 
     <script>
-        // 简化的登录状态检查和导航更新
+        // 统一首页登录态导航：登录后显示「用户名 + 退出」，未登录显示「登录」。
         function updateNavigation() {
             const token = localStorage.getItem('token');
             const loginLink = document.getElementById('loginLink');
-            
-            if (token) {
-                // 如果有token，替换登录链接为用户名和登出
-                loginLink.textContent = '登出';
-                loginLink.href = '#';
-                loginLink.onclick = function(e) {
-                    e.preventDefault();
-                    localStorage.removeItem('token');
-                    window.location.reload();
-                };
-            } else {
-                loginLink.textContent = '登录/注册';
-                loginLink.href = 'login.html';
+            const profileLink = document.getElementById('profileLink');
+            const logoutLink = document.getElementById('logoutLink');
+            const usernameDisplay = document.getElementById('usernameDisplay');
+
+            if (!loginLink || !profileLink) {
+                return;
             }
+
+            if (token) {
+                loginLink.style.display = 'none';
+                profileLink.style.display = 'inline-flex';
+
+                fetch('/api/users/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data && data.success && data.data && usernameDisplay) {
+                        usernameDisplay.textContent = data.data.username || '用户';
+                    } else if (usernameDisplay) {
+                        usernameDisplay.textContent = '用户';
+                    }
+                })
+                .catch(() => {
+                    if (usernameDisplay) {
+                        usernameDisplay.textContent = '用户';
+                    }
+                });
+
+                if (logoutLink) {
+                    logoutLink.onclick = function (e) {
+                        e.preventDefault();
+                        localStorage.removeItem('token');
+                        window.location.reload();
+                    };
+                }
+                return;
+            }
+
+            profileLink.style.display = 'none';
+            loginLink.style.display = 'inline-flex';
+            loginLink.textContent = '登录';
+            loginLink.href = 'login.html';
         }
         
         // 页面加载完成后更新导航

@@ -2,6 +2,19 @@
 
 SeedAI使用MySQL 8.0作为数据存储，本目录包含数据库初始化和管理脚本。
 
+## 推荐策略（解耦）
+
+- `init_db.sql` 只用于首次初始化。
+- 后续结构变更（新增表、字段、索引）统一放到 `migrations/*.sql`。
+- 每次变更一个文件，使用 `migrate.py` 单独执行，无需修改历史SQL。
+- 禁止在 `backend` 目录通过 `db.create_all()` 做结构变更。
+
+## 已落地迁移
+
+- `20260308_1015_create_dataset_label_categories.sql`
+    - 新增 `dataset_label_categories` 表
+    - 用于保存数据集任务类型与类别配置
+
 ## 目录结构
 
 ```
@@ -9,11 +22,43 @@ mysql_data/
 ├── README.md                    # 数据库操作说明
 ├── init_db.sql                  # SQL初始化脚本
 ├── init_database.py             # Python数据库初始化脚本
+├── migrate.py                   # 增量迁移执行器（推荐）
+├── migrations/                  # 增量SQL目录
+│   ├── README.md                # 迁移规则说明
+│   └── templates/
+│       └── new_table_template.sql
 └── db_operations/              # 数据库操作脚本目录
     ├── __init__.py             # 初始化文件
     ├── db_operations.py        # 数据库操作工具
     └── README.md               # 操作说明
 ```
+
+## 新增表（不改主文件）
+
+如果你要新增一个表，按下列步骤：
+
+1. 复制模板文件：`migrations/templates/new_table_template.sql`
+2. 重命名为时间戳文件，例如：`20260308_1015_create_xxx.sql`
+3. 只写这次变更的SQL
+4. 运行单文件迁移：
+
+```bash
+python mysql_data/migrate.py --file 20260308_1015_create_xxx.sql
+```
+
+5. 若要执行全部未执行变更：
+
+```bash
+python mysql_data/migrate.py --all
+```
+
+6. 查看状态：
+
+```bash
+python mysql_data/migrate.py --status
+```
+
+系统会自动维护 `schema_migrations` 表，避免重复执行。
 
 ## 数据库初始化
 
@@ -28,6 +73,8 @@ docker-compose up -d mysql
 # 执行数据库初始化
 docker exec -w /app seedai-backend-1 python /app/init_database.py
 ```
+
+初始化后，后续结构迭代请使用 `migrate.py`，不要继续改 `init_db.sql`。
 
 ### 方法2: 直接导入SQL文件
 
@@ -103,11 +150,7 @@ docker exec -i seedai-mysql-1 mysql -u root -prootpass ai_dataset < backup_file.
 
 ### images 表
 - 图片信息存储表
-- 包含文件名、路径、所属数据集、标注信息等字段
-
-### annotations 表
-- 标注信息存储表
-- 包含标注框坐标、标签、置信度等信息
+- 包含文件名、路径、所属数据集、上传用户、图片尺寸（width/height）及标注 JSON 字段
 
 ## 数据库维护
 

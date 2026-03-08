@@ -7,6 +7,36 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --background-color: #f5f7fb;
+            --card-background: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: #d9e1ea;
+            --border-radius: 8px;
+            --border-radius-lg: 12px;
+            --transition: all 0.2s ease-in-out;
+            --shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.55rem 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
         .admin-layout {
             display: flex;
             min-height: 100vh;
@@ -160,6 +190,10 @@
         .btn-primary {
             background: var(--primary-color);
             color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
         }
 
         .btn-danger {

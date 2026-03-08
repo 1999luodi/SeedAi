@@ -63,6 +63,7 @@ class Dataset(db.Model):
 
     # 关系
     images = db.relationship('Image', backref='dataset', lazy=True)
+    label_category = db.relationship('DatasetLabelCategory', backref='dataset', uselist=False, lazy=True)
 
     def to_dict(self):
         return {
@@ -100,11 +101,10 @@ class Image(db.Model):
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     file_path = db.Column(db.String(500))
     file_size = db.Column(db.Integer)  # 文件大小（字节）
+    width = db.Column(db.Integer)
+    height = db.Column(db.Integer)
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
-    annotations = db.Column(db.Text)  # 存储标注数据的JSON字符串
-
-    # 关系
-    annotations_detail = db.relationship('Annotation', backref='image', lazy=True)
+    annotations_path = db.Column(db.String(500))  # COCO标注文件路径
 
     def to_dict(self):
         return {
@@ -115,8 +115,10 @@ class Image(db.Model):
             'uploaded_by': self.uploaded_by,
             'file_path': self.file_path,
             'file_size': self.file_size,
+            'width': self.width,
+            'height': self.height,
             'upload_date': self.upload_date.isoformat() if self.upload_date else None,
-            'annotations': self.annotations
+            'annotations_path': self.annotations_path
         }
 
     def to_admin_dict(self):
@@ -126,33 +128,28 @@ class Image(db.Model):
             'dataset_name': self.dataset.name if self.dataset else 'Unknown',
             'uploader_username': self.uploader.username if self.uploader else 'Unknown',
             'file_size': self.file_size,
-            'annotation_count': len(self.annotations_detail),
+            'width': self.width,
+            'height': self.height,
+            'annotations_path': self.annotations_path,
             'created_at': self.upload_date.isoformat() if self.upload_date else None
         }
 
 
-class Annotation(db.Model):
-    __tablename__ = 'annotations'
+class DatasetLabelCategory(db.Model):
+    __tablename__ = 'dataset_label_categories'
 
-    id = db.Column(db.Integer, primary_key=True)
-    image_id = db.Column(db.Integer, db.ForeignKey('images.id'), nullable=False)
-    label = db.Column(db.String(100), nullable=False)  # 标签名称
-    x_min = db.Column(db.Float, nullable=False)  # 边界框左上角x坐标 (0-1之间)
-    y_min = db.Column(db.Float, nullable=False)  # 边界框左上角y坐标 (0-1之间)
-    x_max = db.Column(db.Float, nullable=False)  # 边界框右下角x坐标 (0-1之间)
-    y_max = db.Column(db.Float, nullable=False)  # 边界框右下角y坐标 (0-1之间)
-    confidence = db.Column(db.Float, default=1.0)  # 置信度
+    # 以数据集ID为主键，一对一存储该数据集的标注类别配置
+    dataset_id = db.Column(db.Integer, db.ForeignKey('datasets.id'), primary_key=True)
+    task_type = db.Column(db.String(50), nullable=False, default='detection')  # detection 或 classification
+    categories = db.Column(db.Text, default='[]')  # JSON字符串数组，例如 ["seed", "root"]
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'image_id': self.image_id,
-            'label': self.label,
-            'x_min': self.x_min,
-            'y_min': self.y_min,
-            'x_max': self.x_max,
-            'y_max': self.y_max,
-            'confidence': self.confidence,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'dataset_id': self.dataset_id,
+            'task_type': self.task_type,
+            'categories': self.categories,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

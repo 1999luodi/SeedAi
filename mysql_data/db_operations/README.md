@@ -2,6 +2,9 @@
 
 此目录包含用于管理SeedAI项目数据库的各种操作脚本。
 
+> 说明：本目录用于运维辅助操作（用户、索引、统计）。
+> 数据库结构变更（新增表/字段）请使用 `mysql_data/migrate.py` + `mysql_data/migrations/*.sql`。
+
 ## 文件说明
 
 - `db_operations.py`: 数据库管理脚本，用于执行各种数据库操作

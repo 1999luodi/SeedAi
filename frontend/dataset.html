@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数据集管理 - SeedAI</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+    <link rel="stylesheet" href="style.css?v=20260309ai">
 </head>
 <body>
     <header class="header">
@@ -35,386 +34,103 @@
 
     <main class="main">
         <div class="container">
-            <div class="page-header">
-                <h1>📁 数据集管理</h1>
-                <p>创建、组织和管理您的图像数据集</p>
-            </div>
-
-            <div class="dataset-controls">
-                <button id="createDatasetBtn" class="btn btn-primary">
-                    <span class="btn-icon">+</span>
-                    创建新数据集
-                </button>
-            </div>
-
-            <div class="dataset-list" id="datasetList">
-                <div class="placeholder">
-                    <div class="placeholder-icon">📁</div>
-                    <h3>暂无数据集</h3>
-                    <p>点击上方按钮创建您的第一个数据集</p>
+            <section class="dm-header">
+                <div>
+                    <h2>数据集管理</h2>
+                    <p>创建数据集、上传文件、进入标注流程。</p>
                 </div>
-            </div>
+                <button id="dmCreateBtn" class="btn btn-primary">创建数据集</button>
+            </section>
+
+            <section id="dmListView" class="dm-list-view">
+                <div id="dmDatasetCards" class="dm-cards"></div>
+            </section>
+
+            <section id="dmDetailView" class="dm-detail-view" style="display:none;">
+                <div class="dm-detail-top">
+                    <div>
+                        <h3 id="dmDatasetTitle">数据集</h3>
+                        <p id="dmDatasetMeta">-</p>
+                    </div>
+                    <div class="dm-toolbar">
+                        <button id="dmUploadBtn" class="btn btn-secondary">上传文件</button>
+                        <button id="dmGoAnnotateBtn" class="btn btn-primary">标注数据</button>
+                        <button id="dmBackBtn" class="btn btn-secondary">返回列表</button>
+                    </div>
+                </div>
+
+                <div class="dm-detail-grid">
+                    <div class="dm-files-panel">
+                        <h4>数据文件</h4>
+                        <div id="dmFileList" class="dm-scroll"></div>
+                    </div>
+                    <div class="dm-anno-panel">
+                        <h4>标注数据</h4>
+                        <div id="dmAnnoSummary" class="dm-scroll"></div>
+                    </div>
+                </div>
+            </section>
         </div>
     </main>
 
-    <!-- 创建数据集模态框 -->
-    <div id="createDatasetModal" class="modal">
-        <div class="modal-content">
+    <div id="dmCreateModal" class="modal" style="display:none;">
+        <div class="modal-content dm-modal">
             <div class="modal-header">
-                <h3>创建新数据集</h3>
-                <span class="close">&times;</span>
+                <h3>创建数据集</h3>
+                <button id="dmCloseCreate" class="modal-close" type="button">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="datasetForm">
+                <form id="dmCreateForm">
                     <div class="form-group">
-                        <label for="datasetName">数据集名称</label>
-                        <input type="text" id="datasetName" placeholder="输入数据集名称" required>
+                        <label for="dmName">数据集名</label>
+                        <input id="dmName" type="text" required>
                     </div>
                     <div class="form-group">
-                        <label for="datasetDescription">描述</label>
-                        <textarea id="datasetDescription" placeholder="输入数据集描述"></textarea>
+                        <label for="dmDesc">描述</label>
+                        <textarea id="dmDesc"></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="datasetCategory">类型</label>
-                        <select id="datasetCategory">
-                            <option value="detection" selected>目标检测</option>
+                        <label for="dmType">类型</label>
+                        <select id="dmType">
                             <option value="classification">分类</option>
+                            <option value="detection" selected>检测</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label class="checkbox">
-                            <input type="checkbox" id="isPublic">
-                            <span class="checkmark"></span>
-                            公开数据集
-                        </label>
-                    </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">创建数据集</button>
-                        <button type="button" class="btn btn-secondary cancel">取消</button>
+                        <button type="submit" class="btn btn-primary">创建</button>
+                        <button id="dmCancelCreate" type="button" class="btn btn-secondary">取消</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <script>
-        // 检查用户登录状态
-        function checkLoginStatus() {
-            const token = localStorage.getItem('token');
-            return !!token;
-        }
+    <div id="dmUploadModal" class="modal" style="display:none;">
+        <div class="modal-content dm-modal dm-upload-modal">
+            <div class="modal-header">
+                <h3>上传文件</h3>
+                <button id="dmCloseUpload" class="modal-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="dm-note">支持拖拽多文件，或从本地目录选择。单次最多1000个文件。</p>
+                <div id="dmDropZone" class="dm-drop-zone">
+                    <p>拖动文件到此区域</p>
+                    <p>或使用下方按钮选择</p>
+                </div>
+                <div class="dm-upload-actions">
+                    <button id="dmPickFilesBtn" class="btn btn-secondary" type="button">选择文件</button>
+                    <button id="dmPickFolderBtn" class="btn btn-secondary" type="button">选择目录</button>
+                    <button id="dmStartUploadBtn" class="btn btn-primary" type="button">开始上传</button>
+                </div>
+                <input id="dmFileInput" type="file" multiple style="display:none;">
+                <input id="dmFolderInput" type="file" webkitdirectory directory multiple style="display:none;">
+                <div id="dmUploadList" class="dm-upload-list"></div>
+            </div>
+        </div>
+    </div>
 
-        // 退出登录
-        function logout() {
-            localStorage.removeItem('token');
-            window.location.href = 'index.html';
-        }
-
-        // 初始化页面时检查登录状态
-        document.addEventListener('DOMContentLoaded', function() {
-            const isLoggedIn = checkLoginStatus();
-            const loginLink = document.getElementById('loginLink');
-            const profileLink = document.getElementById('profileLink');
-            const logoutLink = document.getElementById('logoutLink');
-            const usernameDisplay = document.getElementById('usernameDisplay');
-            
-            if (isLoggedIn) {
-                // 用户已登录，显示用户名和退出链接
-                loginLink.style.display = 'none';
-                profileLink.style.display = 'block';
-                
-                // 获取用户信息并显示用户名
-                fetch('/api/users/profile', {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        usernameDisplay.textContent = data.data.username;
-                    }
-                })
-                .catch(err => console.error('获取用户信息失败:', err));
-                
-                // 为退出登录链接添加事件监听器
-                if (logoutLink) {
-                    logoutLink.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        logout();
-                    });
-                }
-            } else {
-                // 用户未登录，跳转到登录页面
-                // 注意：这里我们不再强制跳转，而是显示登录链接
-                loginLink.style.display = 'block';
-                profileLink.style.display = 'none';
-            }
-            
-            // 初始化页面组件
-            initializeDatasetManager();
-        });
-
-        function initializeDatasetManager() {
-            // 数据集管理类
-            class DatasetManager {
-                constructor() {
-                    this.datasets = [];
-                    this.initElements();
-                    this.bindEvents();
-                    this.loadData();
-                }
-
-                initElements() {
-                    this.datasetList = document.getElementById('datasetList');
-                    this.createDatasetBtn = document.getElementById('createDatasetBtn');
-                    this.modal = document.getElementById('createDatasetModal');
-                    this.closeBtn = document.querySelector('.close');
-                    this.cancelBtn = document.querySelector('.cancel');
-                    this.datasetForm = document.getElementById('datasetForm');
-                }
-
-                bindEvents() {
-                    this.createDatasetBtn.addEventListener('click', () => this.openModal());
-                    this.closeBtn.addEventListener('click', () => this.closeModal());
-                    this.cancelBtn.addEventListener('click', () => this.closeModal());
-                    this.datasetForm.addEventListener('submit', (e) => this.handleSubmit(e));
-                    
-                    // 点击模态框外部关闭
-                    window.addEventListener('click', (event) => {
-                        if (event.target === this.modal) {
-                            this.closeModal();
-                        }
-                    });
-                }
-
-                async loadData() {
-                    try {
-                        const token = localStorage.getItem('token');
-                        if (!token) {
-                            window.location.href = 'login.html';
-                            return;
-                        }
-                        
-                        const params = new URLSearchParams(window.location.search);
-                        const datasetId = params.get('id');
-                        if (datasetId) {
-                            // 查看单个数据集详情
-                            return this.loadDatasetDetails(datasetId);
-                        }
-
-                        const response = await fetch('/api/datasets', {
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            this.datasets = data.data || [];
-                            this.render();
-                        } else {
-                            console.error('获取数据集失败:', response.status);
-                        }
-                    } catch (error) {
-                        console.error('加载数据失败:', error);
-                    }
-                }
-
-                render() {
-                    if (this.datasets.length === 0) {
-                        this.datasetList.innerHTML = `
-                            <div class="placeholder">
-                                <div class="placeholder-icon">📁</div>
-                                <h3>暂无数据集</h3>
-                                <p>点击上方按钮创建您的第一个数据集</p>
-                            </div>
-                        `;
-                        return;
-                    }
-
-                    this.datasetList.innerHTML = this.datasets.map(dataset => `
-                        <div class="dataset-card">
-                            <div class="dataset-header">
-                                <div class="dataset-info">
-                                    <h3>${dataset.name}</h3>
-                                    <p>${dataset.description || '暂无描述'}</p>
-                                </div>
-                                <div class="dataset-meta">
-                                    <span class="dataset-type">类型: ${dataset.category === 'classification' ? '分类' : '目标检测'}</span>
-                                    <span class="dataset-images">${dataset.image_count || 0} 张图片</span>
-                                    <span class="dataset-status ${dataset.is_public ? 'public' : 'private'}">
-                                        ${dataset.is_public ? '公开' : '私有'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="dataset-actions">
-                                <button class="btn btn-secondary" onclick="datasetManager.viewDataset(${dataset.id})">查看</button>
-                                <button class="btn btn-secondary" onclick="datasetManager.uploadImages(${dataset.id})">上传图片</button>
-                                <button class="btn btn-secondary" onclick="datasetManager.annotateDataset(${dataset.id})">手工标注</button>
-                                <button class="btn btn-danger" onclick="datasetManager.deleteDataset(${dataset.id})">删除</button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-
-                openModal() {
-                    this.modal.style.display = 'block';
-                    document.getElementById('datasetName').focus();
-                }
-
-                closeModal() {
-                    this.modal.style.display = 'none';
-                    this.datasetForm.reset();
-                }
-
-                async handleSubmit(event) {
-                    event.preventDefault();
-                    
-                    const name = document.getElementById('datasetName').value;
-                    const description = document.getElementById('datasetDescription').value;
-                    const isPublic = document.getElementById('isPublic').checked;
-                    const category = document.getElementById('datasetCategory').value;
-                    
-                    if (!name.trim()) {
-                        this.showMessage('请输入数据集名称', 'error');
-                        return;
-                    }
-
-                    try {
-                        const token = localStorage.getItem('token');
-                        const response = await fetch('/api/datasets', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({
-                                name,
-                                description,
-                                is_public: isPublic,
-                                category
-                            })
-                        });
-
-                        const result = await response.json();
-
-                        if (response.status === 201) {
-                            this.showMessage('数据集创建成功', 'success');
-                            this.closeModal();
-                            this.loadData(); // 重新加载数据
-                        } else {
-                            this.showMessage(result.message || '创建失败', 'error');
-                        }
-                    } catch (error) {
-                        console.error('创建数据集错误:', error);
-                        this.showMessage('网络错误，请稍后重试', 'error');
-                    }
-                }
-
-                async deleteDataset(id) {
-                    if (!confirm('确定要删除这个数据集吗？此操作不可恢复！')) {
-                        return;
-                    }
-
-                    try {
-                        const token = localStorage.getItem('token');
-                        const response = await fetch(`/api/datasets/${id}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        });
-
-                        if (response.ok) {
-                            this.showMessage('数据集删除成功', 'success');
-                            this.loadData(); // 重新加载数据
-                        } else {
-                            this.showMessage('删除失败', 'error');
-                        }
-                    } catch (error) {
-                        console.error('删除数据集错误:', error);
-                        this.showMessage('网络错误，请稍后重试', 'error');
-                    }
-                }
-
-                viewDataset(id) {
-                    window.location.href = `dataset.html?id=${id}`;
-                }
-
-                uploadImages(id) {
-                    window.location.href = `dataset.html?upload=${id}`;
-                }
-
-                async loadDatasetDetails(id) {
-                    try {
-                        const token = localStorage.getItem('token');
-                        // 获取数据集元信息
-                        const res1 = await fetch(`/api/datasets/${id}`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const info = await res1.json();
-                        if (!res1.ok || !info.data) {
-                            this.showMessage('无法获取数据集详情', 'error');
-                            return;
-                        }
-                        const dataset = info.data;
-                        // 获取所有文件/图片
-                        const res2 = await fetch(`/api/datasets/${id}/images`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const imagesResp = await res2.json();
-                        const files = imagesResp.data || [];
-                        this.renderDatasetDetails(dataset, files);
-                    } catch (err) {
-                        console.error('加载数据集详情失败:', err);
-                    }
-                }
-
-                renderDatasetDetails(dataset, files) {
-                    // 清空列表并展示详情区域
-                    this.datasetList.innerHTML = `
-                        <div class="dataset-detail">
-                            <h2>${dataset.name}</h2>
-                            <p>${dataset.description || '暂无描述'}</p>
-                            <p>类型：${dataset.category === 'classification' ? '分类' : '目标检测'}</p>
-                            <h3>数据文件</h3>
-                            <ul id="fileList">
-                                ${files.length ? files.map(f => `<li>${f.filename}</li>`).join('') : '<li>暂无文件</li>'}
-                            </ul>
-                            <h3>说明</h3>
-                            <pre id="datasetNotes">${
-                                dataset.category === 'classification'
-                                    ? '分类数据集使用.mat文件，说明文件列出所有类别。标注文件每行：数据名, 类别。'
-                                    : '目标检测数据集使用图片，标注文件每行：数据名, x_min, y_min, x_max, y_max, 类别, 置信度。手工标注置信度为100。说明文件列出所有类别。'
-                            }</pre>
-                            <button class="btn btn-secondary" onclick="window.location.href='dataset.html'">返回列表</button>
-                        </div>
-                    `;
-                }
-                annotateDataset(id) {
-                    window.location.href = `annotate.html?dataset=${id}`;
-                }
-
-                showMessage(message, type) {
-                    // 创建消息元素
-                    const messageEl = document.createElement('div');
-                    messageEl.className = `message message-${type}`;
-                    messageEl.textContent = message;
-                    
-                    // 添加到页面
-                    document.body.appendChild(messageEl);
-                    
-                    // 3秒后移除
-                    setTimeout(() => {
-                        messageEl.remove();
-                    }, 3000);
-                }
-            }
-            
-            // 初始化页面
-            window.datasetManager = new DatasetManager();
-        }
-    </script>
+    <script src="js/api-contract.js?v=20260308d"></script>
+    <script src="js/shared.js?v=20260308d"></script>
+    <script src="js/dataset.js?v=20260309b"></script>
 </body>
 </html>
