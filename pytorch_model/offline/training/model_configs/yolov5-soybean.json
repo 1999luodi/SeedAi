@@ -1,0 +1,18 @@
+{
+  "model_name": "yolov5-大豆",
+  "display_name": "yolov5s",
+  "seed_type": "大豆",
+  "base_weights": "yolov5s.pt",
+  "model_output_path": "offline/models/training/soybean/yolov5s.pt",
+  "service_model_output_path": "online/models/service/soybean/yolov5-soybean.onnx",
+  "data_path": "datasets/soybean/data.yaml",
+  "num_classes": 3,
+  "class_names": ["腐烂", "发芽", "未发芽"],
+  "training": {
+    "epochs": 100,
+    "imgsz": 640,
+    "batch": 16,
+    "device": "cpu",
+    "project": "output/train"
+  }
+}

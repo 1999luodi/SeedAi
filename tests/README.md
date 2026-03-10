@@ -438,7 +438,7 @@ assert_token_valid(token)
 运行完整测试前，请确保：
 
 - [ ] Docker 容器已启动 (`docker-compose ps`)
-- [ ] 后端服务正在运行 (http://localhost:5000/health)
+- [ ] 后端服务正在运行 (http://localhost:5000)
 - [ ] 前端可以访问 (http://localhost/)
 - [ ] 数据库连接正常
 - [ ] Python依赖已安装 (`pip install -r requirements.txt`)
@@ -510,7 +510,7 @@ docker logs seedai-backend-1
 docker-compose restart backend
 
 # 验证连接
-curl http://localhost:5000/health
+curl http://localhost:5000
 ```
 
 ### 问题：测试找不到模块

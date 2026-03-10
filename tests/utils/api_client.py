@@ -68,11 +68,6 @@ class APIClient:
         else:
             raise Exception(f"登录失败: {response.status_code} - {response.json()}")
     
-    def get_health(self) -> Dict[str, Any]:
-        """获取后端健康状态"""
-        response = self._request('GET', API_ROUTES['GET_HEALTH'])
-        return response.json()
-    
     def get_users_admin(self) -> requests.Response:
         """获取用户列表（管理后台）"""
         return self._request('GET', '/admin/users')

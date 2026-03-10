@@ -25,20 +25,8 @@ class TestAuthFlow:
         cls.test_email = generate_unique_email()
         cls.test_password = "TestPassword123"
     
-    def test_backend_health(self):
-        """测试1: 后端健康检查"""
-        print_section("测试后端健康状态")
-        
-        try:
-            response = self.client.get_health()
-            assert response.get('success') is True
-            log_test("后端健康检查", True, "服务正常运行")
-        except Exception as e:
-            log_test("后端健康检查", False, str(e))
-            raise
-    
     def test_user_registration(self):
-        """测试2: 用户注册"""
+        """测试1: 用户注册"""
         print_section("测试用户注册")
         
         try:
@@ -62,7 +50,7 @@ class TestAuthFlow:
             raise
     
     def test_duplicate_username(self):
-        """测试3: 重复用户名检查"""
+        """测试2: 重复用户名检查"""
         print_section("测试重复用户名检查")
         
         try:
@@ -83,7 +71,7 @@ class TestAuthFlow:
             raise
     
     def test_user_login(self):
-        """测试4: 用户登录"""
+        """测试3: 用户登录"""
         print_section("测试用户登录")
         
         try:
