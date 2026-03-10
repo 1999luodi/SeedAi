@@ -14,14 +14,60 @@
 # 进入项目根目录
 cd d:\ai-projects\SeedAi
 
-# 启动所有服务
-docker-compose up -d
+# 设置镜像版本号（全部服务统一使用）
+# PowerShell:
+$env:SEEDAI_IMAGE_TAG="202603101436"
 
-# 首次运行需要初始化数据库
-docker-compose run --rm init-db
+# 拉取已发布镜像
+docker compose pull
+
+# 启动基础服务（前端+后端+推理+数据库）
+docker compose up -d mysql backend ai_worker frontend
+
+# 如需训练容器（GPU）
+docker compose --profile train up -d ai_trainer
 ```
 
+说明：`docker-compose.yml` 已使用 `SEEDAI_IMAGE_TAG` 变量管理镜像版本。
+后续发布新镜像时，只需要更新这个版本号并重新 `pull + up -d`。
+
 访问 `http://localhost` 即可看到登录页面。
+
+## 项目使用方法（前台/后台）
+
+### 前台使用（数据与标注/检测）
+
+1. 打开前台登录页：`http://localhost/login`
+2. 使用普通用户登录：`user1 / 123456`
+3. 进入前台页面后，常用入口：
+  - 数据集列表：`http://localhost/dataset.html`
+  - 标注页面：`http://localhost/annotate.html`
+  - 检测页面：`http://localhost/detection.html`
+4. 检测流程：
+  - 选择数据集和图片
+  - 点击检测按钮发起推理
+  - 查看检测框、类别和置信度结果
+
+### 后台使用（管理用户与数据）
+
+1. 打开后台入口：`http://localhost/admin`
+2. 使用管理员或超级管理员登录：
+  - 超级管理员：`admin / 123456`
+3. 常用后台页面：
+  - 用户管理：`http://localhost/admin/users`
+  - 数据集管理：`http://localhost/admin/datasets`
+  - 图片管理：`http://localhost/admin/images`
+  - 统计页面：`http://localhost/admin/stats`
+4. 常见管理操作：
+  - 新增/禁用用户
+  - 管理数据集可见性
+  - 查看与维护图片数据
+
+### 训练容器使用（可选）
+
+1. 启动训练容器：`docker compose --profile train up -d ai_trainer`
+2. 进入训练容器：`docker compose --profile train exec ai_trainer bash`
+3. 在容器内执行训练脚本或导出脚本（按 `pytorch_model/offline/training` 目录组织）。
 
 ### 手动启动
 

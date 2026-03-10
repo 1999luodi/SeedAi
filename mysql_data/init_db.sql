@@ -1,5 +1,6 @@
--- SeedAI 数据库初始化脚本
--- 创建数据库和表结构
+-- SeedAI 数据库初始化脚本（基线）
+-- 仅用于首次建库。
+-- 后续结构变更请统一放到 migrations/*.sql，并通过 migrate.py 执行。
 
 -- 创建数据库（如果不存在）
 CREATE DATABASE IF NOT EXISTS ai_dataset CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

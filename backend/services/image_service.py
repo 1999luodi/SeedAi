@@ -213,8 +213,7 @@ class ImageService:
                 'category_id': category_map.get(label_name, 0),
                 'bbox': [x_min, y_min, width, height],
                 'area': width * height,
-                'iscrowd': 0,
-                'score': float(row.get('confidence', 1.0))
+                'iscrowd': 0
             })
 
         coco_payload = {

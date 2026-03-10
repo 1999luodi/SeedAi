@@ -2852,6 +2852,45 @@ main.ann-app {
     color: var(--category-text);
 }
 
+.ann-label-box-row {
+    display: grid;
+    grid-template-columns: 16px minmax(70px, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    cursor: default;
+}
+
+.ann-label-box-row .ann-label-coord {
+    font-size: 11px;
+    font-family: Consolas, "Courier New", monospace;
+    color: var(--category-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 1;
+    min-width: 140px;
+}
+
+.ann-label-box-row .ann-category-name {
+    min-width: 60px;
+}
+
+.ann-label-box-row.editable {
+    cursor: pointer;
+}
+
+.ann-label-box-row.editable:hover {
+    filter: brightness(0.98);
+}
+
+.ann-label-box-row.active {
+    box-shadow: inset 0 0 0 2px #111827;
+}
+
+.ann-label-box-row .ann-cat-remove {
+    margin-left: auto;
+}
+
 .ann-dataset-option {
     width: 100%;
     text-align: left;

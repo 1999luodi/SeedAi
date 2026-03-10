@@ -11,6 +11,7 @@ from models import db, User, Dataset, Image
 from services.user_service import UserService
 from services.dataset_service import DatasetService
 from services.image_service import ImageService
+from services.model_service import AIModelService
 import os
 import jwt
 from functools import wraps
@@ -19,6 +20,10 @@ from werkzeug.exceptions import BadRequest
 import logging
 from datetime import datetime, timedelta
 from PIL import Image as PILImage, UnidentifiedImageError
+import urllib.request
+import urllib.error
+import uuid
+import json
 
 def create_app():
     app = Flask(__name__, template_folder='templates')
@@ -38,6 +43,80 @@ def create_app():
 # 创建应用实例
 app = create_app()
 logger = logging.getLogger(__name__)
+
+
+def _build_multipart_form_data(fields, file_field, file_name, file_content, file_content_type='application/octet-stream'):
+    """构造 multipart/form-data 请求体，避免引入第三方请求依赖。"""
+    boundary = f"----SeedAIBoundary{uuid.uuid4().hex}"
+    lines = []
+
+    for key, value in (fields or {}).items():
+        lines.append(f"--{boundary}".encode('utf-8'))
+        lines.append(f'Content-Disposition: form-data; name="{key}"'.encode('utf-8'))
+        lines.append(b"")
+        lines.append(str(value).encode('utf-8'))
+
+    safe_name = os.path.basename(file_name or 'image.bin')
+    lines.append(f"--{boundary}".encode('utf-8'))
+    lines.append(
+        f'Content-Disposition: form-data; name="{file_field}"; filename="{safe_name}"'.encode('utf-8')
+    )
+    lines.append(f"Content-Type: {file_content_type}".encode('utf-8'))
+    lines.append(b"")
+    lines.append(file_content)
+    lines.append(f"--{boundary}--".encode('utf-8'))
+
+    body = b"\r\n".join(lines) + b"\r\n"
+    content_type = f"multipart/form-data; boundary={boundary}"
+    return body, content_type
+
+
+def _call_ai_worker_infer(image_file_path, conf_threshold=0.25, model_name='default', model_path=None, class_names=None):
+    infer_url = os.environ.get('AI_WORKER_URL', 'http://ai_worker:8000/infer')
+    timeout = int(os.environ.get('AI_WORKER_TIMEOUT', '120'))
+
+    if not os.path.exists(image_file_path):
+        raise FileNotFoundError('Image file not found on server')
+
+    with open(image_file_path, 'rb') as image_stream:
+        image_bytes = image_stream.read()
+
+    form_fields = {
+        'conf_threshold': conf_threshold,
+        'model_name': model_name,
+    }
+    if model_path:
+        form_fields['model_path'] = model_path
+    if class_names is not None:
+        form_fields['class_names'] = json.dumps(class_names, ensure_ascii=False)
+
+    request_body, content_type = _build_multipart_form_data(
+        fields=form_fields,
+        file_field='image',
+        file_name=os.path.basename(image_file_path),
+        file_content=image_bytes,
+        file_content_type='image/jpeg',
+    )
+
+    request_obj = urllib.request.Request(
+        infer_url,
+        data=request_body,
+        headers={
+            'Content-Type': content_type,
+            'Accept': 'application/json',
+        },
+        method='POST',
+    )
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=timeout) as response:
+            response_text = response.read().decode('utf-8')
+            return json.loads(response_text)
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode('utf-8', errors='ignore')
+        raise RuntimeError(f"AI worker HTTP {error.code}: {detail}")
+    except urllib.error.URLError as error:
+        raise RuntimeError(f"AI worker unavailable: {error}")
 
 def create_response(success, message, data=None, status_code=200):
     """创建标准响应格式"""
@@ -212,11 +291,6 @@ def admin_stats(current_user):
         'private_datasets': Dataset.query.filter_by(is_public=False).count()
     }
     return render_template('admin/stats.html', current_user=current_user, stats=stats)
-
-@app.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
-    return create_response(True, "Service is healthy")
 
 # Authentication routes
 @app.route('/api/auth/register', methods=['POST'])
@@ -529,6 +603,7 @@ def upload_image(current_user, dataset_id):
             return jsonify({'success': False, 'message': 'No file part'}), 400
 
         file = request.files.get('file') or request.files.get('image')
+        annotation_file = request.files.get('annotation')
         
         if file.filename == '':
             return jsonify({'success': False, 'message': 'No selected file'}), 400
@@ -548,12 +623,45 @@ def upload_image(current_user, dataset_id):
             file_path = os.path.join(dataset_folder, unique_filename)
             file.save(file_path)
 
+            saved_annotation_path = None
+            if annotation_file and str(annotation_file.filename or '').strip():
+                ann_name = secure_filename(os.path.basename(str(annotation_file.filename).replace('\\', '/')))
+                if not ann_name.lower().endswith('.json'):
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                    return jsonify({'success': False, 'message': 'Annotation file must be .json'}), 400
+
+                # Validate JSON content before persisting.
+                try:
+                    annotation_payload = json.load(annotation_file.stream)
+                    annotation_file.stream.seek(0)
+                except Exception:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                    return jsonify({'success': False, 'message': 'Invalid annotation JSON'}), 400
+
+                annotations_dir = os.path.join(dataset_folder, 'annotations')
+                os.makedirs(annotations_dir, exist_ok=True)
+                ann_base = os.path.splitext(unique_filename)[0]
+                ann_save_name = f"{ann_base}.json"
+                saved_annotation_path = os.path.join(annotations_dir, ann_save_name)
+
+                try:
+                    with open(saved_annotation_path, 'w', encoding='utf-8') as ann_out:
+                        json.dump(annotation_payload, ann_out, ensure_ascii=False, indent=2)
+                except Exception:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                    return jsonify({'success': False, 'message': 'Failed to save annotation JSON'}), 500
+
             try:
                 with PILImage.open(file_path) as uploaded_image:
                     width, height = uploaded_image.size
             except (UnidentifiedImageError, OSError):
                 if os.path.exists(file_path):
                     os.remove(file_path)
+                if saved_annotation_path and os.path.exists(saved_annotation_path):
+                    os.remove(saved_annotation_path)
                 return jsonify({'success': False, 'message': 'Failed to read image dimensions'}), 400
 
             try:
@@ -567,10 +675,15 @@ def upload_image(current_user, dataset_id):
                     width=width,
                     height=height
                 )
+                if image and saved_annotation_path:
+                    image.annotations_path = saved_annotation_path
+                    db.session.commit()
             except Exception:
                 # Keep filesystem and DB consistent when metadata persistence fails.
                 if os.path.exists(file_path):
                     os.remove(file_path)
+                if saved_annotation_path and os.path.exists(saved_annotation_path):
+                    os.remove(saved_annotation_path)
                 raise
             
             if image:
@@ -625,6 +738,128 @@ def get_image_content(current_user, image_id):
         return send_file(image.file_path)
     except Exception as e:
         logger.error(f"Get image content error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/images/<int:image_id>/detect', methods=['POST'])
+@token_required
+def detect_image(current_user, image_id):
+    """调用AI推理服务并返回标准化检测框。"""
+    try:
+        image = Image.query.get(image_id)
+        if not image:
+            return create_response(False, "Image not found", status_code=404)
+
+        dataset = Dataset.query.get(image.dataset_id)
+        if not dataset:
+            return create_response(False, "Dataset not found", status_code=404)
+
+        if image.uploaded_by != current_user.id and dataset.created_by != current_user.id and not dataset.is_public and current_user.role < 1:
+            return create_response(False, "Permission denied", status_code=403)
+
+        if not image.file_path or not os.path.exists(image.file_path):
+            return create_response(False, "Image file not found", status_code=404)
+
+        payload = request.get_json(silent=True) or {}
+        conf_threshold = payload.get('conf_threshold', 0.25)
+        requested_model_name = str(payload.get('model_name', '') or '').strip()
+
+        model_row = None
+        if requested_model_name:
+            model_row = AIModelService.get_model_by_name(requested_model_name)
+            if not model_row:
+                return create_response(False, f"Model not found: {requested_model_name}", status_code=400)
+        else:
+            model_row = AIModelService.get_active_model()
+
+        model_name = requested_model_name or 'default'
+        model_path = None
+        class_names = None
+        if model_row:
+            model_name = model_row.model_name
+            model_path = model_row.model_path
+            class_names = model_row.get_class_list()
+
+        ai_result = _call_ai_worker_infer(
+            image_file_path=image.file_path,
+            conf_threshold=conf_threshold,
+            model_name=model_name,
+            model_path=model_path,
+            class_names=class_names,
+        )
+
+        if not isinstance(ai_result, dict) or not ai_result.get('success'):
+            message = ai_result.get('message') if isinstance(ai_result, dict) else 'Invalid AI worker response'
+            return create_response(False, message or 'AI detection failed', status_code=502)
+
+        data = ai_result.get('data') or {}
+        image_width = max(float(data.get('image_width') or image.width or 1), 1.0)
+        image_height = max(float(data.get('image_height') or image.height or 1), 1.0)
+        detections = data.get('detections') if isinstance(data.get('detections'), list) else []
+
+        normalized = []
+        for index, item in enumerate(detections, start=1):
+            if not isinstance(item, dict):
+                continue
+            bbox = item.get('bbox')
+            if not isinstance(bbox, (list, tuple)) or len(bbox) < 4:
+                continue
+            try:
+                x1 = float(bbox[0])
+                y1 = float(bbox[1])
+                x2 = float(bbox[2])
+                y2 = float(bbox[3])
+                confidence = float(item.get('confidence', 1.0))
+            except (TypeError, ValueError):
+                continue
+
+            # Support both normalized [0,1] bbox and pixel bbox from worker.
+            maybe_normalized = max(abs(x1), abs(y1), abs(x2), abs(y2)) <= 1.0
+            if maybe_normalized:
+                x1 *= image_width
+                x2 *= image_width
+                y1 *= image_height
+                y2 *= image_height
+
+            if x2 < x1:
+                x1, x2 = x2, x1
+            if y2 < y1:
+                y1, y2 = y2, y1
+
+            x1 = max(0.0, min(image_width, x1))
+            x2 = max(0.0, min(image_width, x2))
+            y1 = max(0.0, min(image_height, y1))
+            y2 = max(0.0, min(image_height, y2))
+
+            normalized.append({
+                'id': index,
+                'label': str(item.get('label', 'unknown')),
+                'x_min': max(0.0, min(1.0, x1 / image_width)),
+                'y_min': max(0.0, min(1.0, y1 / image_height)),
+                'x_max': max(0.0, min(1.0, x2 / image_width)),
+                'y_max': max(0.0, min(1.0, y2 / image_height)),
+                'x_min_px': round(x1, 2),
+                'y_min_px': round(y1, 2),
+                'x_max_px': round(x2, 2),
+                'y_max_px': round(y2, 2),
+                'confidence': max(0.0, min(1.0, confidence))
+            })
+
+        return create_response(True, 'AI detection completed', {
+            'image_id': image.id,
+            'model_name': model_name,
+            'model_path': model_path,
+            'class_list': class_names,
+            'image_width': int(image_width),
+            'image_height': int(image_height),
+            'annotation_count': len(normalized),
+            'annotations': normalized
+        })
+    except RuntimeError as e:
+        logger.error(f"Detect image runtime error: {str(e)}")
+        return create_response(False, str(e), status_code=502)
+    except Exception as e:
+        logger.error(f"Detect image error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/api/images/<int:image_id>', methods=['PUT'])
@@ -1000,58 +1235,6 @@ def delete_user_admin(current_user, user_id):
         logger.error(f"Delete user error: {str(e)}")
         return create_response(False, "Internal server error", status_code=500)
 
-@app.route('/api/ai/inference', methods=['POST'])
-@token_required
-def ai_inference(current_user):
-    """AI推理接口：对上传的图片进行目标检测并返回标注结果"""
-    try:
-        # 这里需要集成AI推理服务
-        # 为了演示目的，我们返回模拟的结果
-        # 在实际实现中，需要调用pytorch_model/inference.py中的推理逻辑
-        if 'image' not in request.files:
-            return create_response(False, "No image provided", status_code=400)
-        
-        file = request.files['image']
-        if file.filename == '':
-            return create_response(False, "No image selected", status_code=400)
-        
-        if file and allowed_file(file.filename):
-            # 临时保存文件用于推理
-            temp_filename = secure_filename(f"temp_{datetime.utcnow().timestamp()}_{file.filename}")
-            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
-            file.save(temp_path)
-            
-            # 在实际实现中，这里会调用AI模型进行推理
-            # from pytorch_model.inference import InferenceEngine
-            # engine = InferenceEngine(model_path="/app/pytorch_model/weights/yolov5s.pt")
-            # results = engine.inference_image(temp_path)
-            
-            # 模拟AI推理结果
-            simulated_results = [
-                {
-                    'label': 'person',
-                    'bbox': [100, 100, 200, 300],
-                    'confidence': 0.95,
-                    'class_id': 0
-                },
-                {
-                    'label': 'car',
-                    'bbox': [300, 200, 500, 400],
-                    'confidence': 0.89,
-                    'class_id': 2
-                }
-            ]
-            
-            # 删除临时文件
-            os.remove(temp_path)
-            
-            return create_response(True, "Inference completed", simulated_results)
-        else:
-            return create_response(False, "Invalid file type", status_code=400)
-    except Exception as e:
-        logger.error(f"AI inference error: {str(e)}")
-        return create_response(False, "Internal server error", status_code=500)
-
 @app.route('/api/endpoints')
 def api_endpoints():
     endpoints = {
@@ -1076,7 +1259,7 @@ def api_endpoints():
             {"method": "GET", "path": "/api/images/{id}", "description": "查看指定图片"},
             {"method": "PUT", "path": "/api/images/{id}", "description": "修改图片信息"},
             {"method": "DELETE", "path": "/api/images/{id}", "description": "删除图片"},
-            {"method": "POST", "path": "/api/datasets/{id}/upload", "description": "上传图片到指定数据集"}
+            {"method": "POST", "path": "/api/datasets/{id}/upload", "description": "上传图片到指定数据集（支持可选 annotation JSON，同名写入 annotations 并回写 annotations_path）"}
         ],
         "数据标注": [
             {"method": "GET", "path": "/api/images/{id}/annotations", "description": "查看图片标注"},
@@ -1085,10 +1268,90 @@ def api_endpoints():
             {"method": "POST", "path": "/api/images/{id}/label-file", "description": "生成COCO标注文件并记录路径"}
         ],
         "AI推理": [
-            {"method": "POST", "path": "/api/ai/inference", "description": "AI推理接口，接收图片返回标注结果"}
+            {"method": "POST", "path": "/api/images/{id}/detect", "description": "AI检测接口，按图片ID调用模型推理并返回标准化标注结果"}
+        ],
+        "模型管理": [
+            {"method": "GET", "path": "/api/models", "description": "获取模型配置列表"},
+            {"method": "POST", "path": "/api/models", "description": "创建模型配置"},
+            {"method": "PUT", "path": "/api/models/{id}", "description": "更新模型配置"},
+            {"method": "POST", "path": "/api/models/{id}/activate", "description": "启用指定模型"}
         ]
     }
     return jsonify(endpoints)
+
+
+@app.route('/api/models', methods=['GET'])
+@token_required
+def list_models(current_user):
+    try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+        rows = AIModelService.list_models()
+        return create_response(True, "Models retrieved", rows)
+    except Exception as e:
+        logger.error(f"List models error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/models', methods=['POST'])
+@token_required
+def create_model(current_user):
+    try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+
+        data = request.get_json(silent=True) or {}
+        row = AIModelService.create_model(
+            model_name=data.get('model_name'),
+            model_path=data.get('model_path'),
+            class_list=data.get('class_list', []),
+            is_active=data.get('is_active', False),
+        )
+        return create_response(True, "Model created", row, status_code=201)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
+    except Exception as e:
+        logger.error(f"Create model error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/models/<int:model_id>', methods=['PUT'])
+@token_required
+def update_model(current_user, model_id):
+    try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+
+        data = request.get_json(silent=True) or {}
+        row = AIModelService.update_model(
+            model_id=model_id,
+            model_name=data.get('model_name') if 'model_name' in data else None,
+            model_path=data.get('model_path') if 'model_path' in data else None,
+            class_list=data.get('class_list') if 'class_list' in data else None,
+            is_active=data.get('is_active') if 'is_active' in data else None,
+        )
+        return create_response(True, "Model updated", row)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
+    except Exception as e:
+        logger.error(f"Update model error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
+
+
+@app.route('/api/models/<int:model_id>/activate', methods=['POST'])
+@token_required
+def activate_model(current_user, model_id):
+    try:
+        if current_user.role < 1:
+            return create_response(False, "Insufficient permissions", status_code=403)
+
+        row = AIModelService.activate_model(model_id)
+        return create_response(True, "Model activated", row)
+    except BadRequest as e:
+        return create_response(False, str(e), status_code=400)
+    except Exception as e:
+        logger.error(f"Activate model error: {str(e)}")
+        return create_response(False, "Internal server error", status_code=500)
 
 @app.route('/backend/api_endpoints.json')
 def api_endpoints_json():

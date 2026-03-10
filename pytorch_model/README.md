@@ -1,35 +1,61 @@
-# PyTorch Model 模块说明
+# PyTorch Model Layout (Strict Two-Area Split)
 
-`pytorch_model/` 负责模型推理能力，不承担业务流程编排。
+本目录只保留两类内容，避免误操作：
 
-## 1. 模块职责
+- `offline/`：线下训练与导出相关代码及训练数据。
+- `online/`：线上接口服务代码与当前在线模型数据。
 
-- 模型加载
-- 单图/批量推理
-- 推理结果标准化输出
+## 1. Offline Area
 
-## 2. 目录建议
+用途：
+- 模型训练
+- 模型导出（PT -> ONNX）
+- 管理训练产物与训练过程文件
 
-- `model.py`：模型结构/加载逻辑
-- `inference.py`：推理入口
-- `utils.py`：图像预处理与后处理
-- `weights/`：模型权重
-- `output/`：推理产物
+主要路径：
+- `offline/training/train_from_config.py`
+- `offline/training/export_to_onnx.py`
+- `offline/training/model_configs/yolov5-soybean.json`
+- `offline/models/training/`
+- `offline/third_party/ultralytics-src`
 
-## 3. 解耦原则
+离线训练命令：
 
-- 不直接依赖前端代码
-- 不直接写入业务数据库
-- 输入输出通过清晰接口定义（路径/数组/JSON）
+```bash
+docker compose --profile train up -d --build ai_trainer
+docker exec -it seedai-ai_trainer-1 python offline/training/train_from_config.py --config offline/training/model_configs/yolov5-soybean.json
+```
 
-## 4. 可扩展点
+## 2. Online Area
 
-- 新模型接入：新增独立加载器，不改旧模型路径
-- 新任务类型：新增独立推理函数（如分类、分割）
-- 新后处理策略：放入 `utils.py`，通过配置切换
+用途：
+- 提供 AI 检测接口服务
+- 加载当前在线 ONNX 模型执行推理
 
-## 5. 运维建议
+主要路径：
+- `online/infer_service/inference.py`
+- `online/infer_service/Dockerfile`
+- `online/infer_service/requirements.txt`
+- `online/models/service/yolov5-soybean.onnx`
 
-- 权重文件版本化管理
-- 记录推理参数（阈值、输入尺寸）
-- 保持接口稳定，避免影响后端调用
+线上服务命令：
+
+```bash
+docker compose up -d --build ai_worker backend frontend
+```
+
+## 3. Model Data Rule
+
+- 训练模型与中间权重：只放 `offline/models/training/`
+- 在线推理模型：只放 `online/models/service/`
+
+## 4. Container Binding Rule
+
+- `ai_worker` 只使用 `online/` 下的服务代码与模型。
+- `ai_trainer` 只执行 `offline/` 下的训练与导出流程。
+
+## 5. Current Service Model
+
+当前线上默认模型路径：
+
+- `/workspace/online/models/service/yolov5-soybean.onnx`

@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import json
 
 db = SQLAlchemy()
 
@@ -152,4 +153,43 @@ class DatasetLabelCategory(db.Model):
             'categories': self.categories,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class AIModelConfig(db.Model):
+    __tablename__ = 'ai_models'
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_name = db.Column(db.String(120), unique=True, nullable=False)
+    model_path = db.Column(db.String(500), nullable=False)
+    class_count = db.Column(db.Integer, nullable=False, default=0)
+    class_list = db.Column(db.Text, nullable=False, default='[]')
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_class_list(self):
+        try:
+            parsed = json.loads(self.class_list or '[]')
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed]
+        except (TypeError, ValueError):
+            pass
+        return []
+
+    def set_class_list(self, values):
+        rows = [str(item).strip() for item in (values or []) if str(item).strip()]
+        self.class_list = json.dumps(rows, ensure_ascii=False)
+        self.class_count = len(rows)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'model_name': self.model_name,
+            'model_path': self.model_path,
+            'class_count': self.class_count,
+            'class_list': self.get_class_list(),
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

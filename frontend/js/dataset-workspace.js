@@ -263,6 +263,17 @@ class DatasetWorkspacePage {
             return;
         }
 
+        const validation = this.validateUploadPairs(this.pendingFiles);
+        if (validation.blockedMessages.length) {
+            const preview = validation.blockedMessages.slice(0, 12).join('\n');
+            alert(`以下文件不满足一一唯一对应规则，已阻止上传:\n${preview}${validation.blockedMessages.length > 12 ? '\n...（其余略）' : ''}`);
+        }
+
+        if (!validation.validPairs.length) {
+            this.el.uploadList.innerHTML = '<p>没有符合规则的文件可上传</p>';
+            return;
+        }
+
         const totalBytes = this.pendingFiles.reduce((acc, file) => acc + (file.size || 0), 0);
         if (this.pendingFiles.length > WS_MAX_FILES) {
             alert(`文件数量不能超过 ${WS_MAX_FILES} 个`);
@@ -276,19 +287,22 @@ class DatasetWorkspacePage {
         const uploaded = [];
         const failed = [];
 
-        for (let index = 0; index < this.pendingFiles.length; index += 1) {
-            const file = this.pendingFiles[index];
+        for (let index = 0; index < validation.validPairs.length; index += 1) {
+            const pair = validation.validPairs[index];
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', pair.imageFile);
+            if (pair.annotationFile) {
+                formData.append('annotation', pair.annotationFile);
+            }
 
             try {
                 await SeedAI.api.upload(SeedAI.api.route('POST_API_DATASETS_BY_DATASET_ID_UPLOAD', { dataset_id: this.datasetId }), formData);
-                uploaded.push(file.name);
+                uploaded.push(pair.imageFile.name + (pair.annotationFile ? ` + ${pair.annotationFile.name}` : ''));
             } catch (error) {
-                failed.push(`${file.name}: ${error.message}`);
+                failed.push(`${pair.imageFile.name}: ${error.message}`);
             }
 
-            this.el.uploadList.innerHTML = `<p>上传进度 ${index + 1}/${this.pendingFiles.length}</p>`;
+            this.el.uploadList.innerHTML = `<p>上传进度 ${index + 1}/${validation.validPairs.length}</p>`;
         }
 
         if (uploaded.length) {
@@ -304,6 +318,67 @@ class DatasetWorkspacePage {
         }
 
         await this.loadDataset();
+    }
+
+    validateUploadPairs(files) {
+        const imageExt = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp']);
+        const grouped = new Map();
+        const blockedMessages = [];
+        const validPairs = [];
+
+        const getStem = (name) => {
+            const n = String(name || '');
+            const dot = n.lastIndexOf('.');
+            return (dot > 0 ? n.slice(0, dot) : n).toLowerCase();
+        };
+        const getExt = (name) => {
+            const n = String(name || '');
+            const dot = n.lastIndexOf('.');
+            return dot > -1 ? n.slice(dot + 1).toLowerCase() : '';
+        };
+
+        (files || []).forEach((file) => {
+            const stem = getStem(file.name);
+            if (!grouped.has(stem)) {
+                grouped.set(stem, []);
+            }
+            grouped.get(stem).push(file);
+        });
+
+        grouped.forEach((rows, stem) => {
+            if (rows.length >= 3) {
+                blockedMessages.push(`文件名 ${stem} 出现 ${rows.length} 次（>=3），该组全部禁止上传`);
+                return;
+            }
+
+            const images = rows.filter((f) => imageExt.has(getExt(f.name)));
+            const jsons = rows.filter((f) => getExt(f.name) === 'json');
+            const others = rows.filter((f) => !imageExt.has(getExt(f.name)) && getExt(f.name) !== 'json');
+
+            if (others.length > 0) {
+                blockedMessages.push(`文件名 ${stem} 包含不支持的文件类型，已禁止上传`);
+                return;
+            }
+            if (images.length > 1 || jsons.length > 1) {
+                blockedMessages.push(`文件名 ${stem} 不是一一唯一对应（图片:${images.length}, JSON:${jsons.length}），已禁止上传`);
+                return;
+            }
+            if (jsons.length === 1 && images.length === 0) {
+                blockedMessages.push(`文件名 ${stem} 只有JSON没有对应图片，已禁止上传`);
+                return;
+            }
+            if (images.length === 0) {
+                return;
+            }
+
+            validPairs.push({
+                stem,
+                imageFile: images[0],
+                annotationFile: jsons[0] || null
+            });
+        });
+
+        return { validPairs, blockedMessages };
     }
 
     async updateVisibility() {

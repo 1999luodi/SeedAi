@@ -66,3 +66,43 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 2. 后端：补 model/service/api。
 3. 前端：接入 API 与页面状态。
 4. 测试：补最小回归用例。
+
+## 10. Docker 镜像源与环境版本
+
+### 10.1 服务镜像命名约定
+
+- 本项目约定：自建服务镜像名不带序号，容器名带序号（如 `-1`）。
+- 当前自建镜像：`seedai-backend`、`seedai-ai_worker`、`seedai-ai_trainer`。
+- 当前容器命名：`seedai-mysql-1`、`seedai-backend-1`、`seedai-ai_worker-1`、`seedai-ai_trainer-1`、`seedai-frontend-1`。
+
+### 10.2 Docker 基础镜像源地址
+
+- `mysql`：`docker.io/mysql:8.0`
+- `frontend`：`docker.io/nginx:alpine`
+- `backend` 基础镜像：`docker.m.daocloud.io/library/python:3.11-slim`
+- `ai_worker` 基础镜像：`docker.m.daocloud.io/library/python:3.11-slim`
+- `ai_trainer` 基础镜像：`docker.io/pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime`
+
+### 10.3 各服务运行环境版本
+
+- `mysql`
+	- MySQL: `8.0`
+- `frontend`
+	- Nginx: `alpine`（随官方标签更新）
+- `backend`
+	- Python: `3.11-slim`
+	- Flask: 由 `backend/requirements.txt` 管理
+	- pip 源: `https://pypi.tuna.tsinghua.edu.cn/simple/`
+- `ai_worker`
+	- Python: `3.11-slim`
+	- Flask: `2.3.2`
+	- numpy: `1.26.4`
+	- opencv-python-headless: `4.8.1.78`
+	- onnxruntime: `1.18.1`
+- `ai_trainer`
+	- Base Runtime: `pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime`
+	- torch: `2.0.1`
+	- torchvision: `0.15.2`
+	- torchaudio: `2.0.2`
+	- numpy: `1.24.3`
+	- pip 源: `https://pypi.tuna.tsinghua.edu.cn/simple/`

@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: luodi1999/seedai-mysql:${SEEDAI_IMAGE_TAG:-202603101436}
     container_name: seedai-mysql-1
     ports:
       - "3306:3306"
@@ -10,12 +10,11 @@ services:
     volumes:
       - ./mysql_data/data:/var/lib/mysql
       - ./mysql_data/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ./mysql_data/migrations:/migrations:ro
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: luodi1999/seedai-backend:${SEEDAI_IMAGE_TAG:-202603101436}
     container_name: seedai-backend-1
     working_dir: /app
     volumes:
@@ -29,25 +28,50 @@ services:
       - DB_USER=root
       - DB_PASSWORD=rootpass
       - DB_NAME=ai_dataset
-      - MODEL_PATH=/app/pytorch_model/weights/yolov5s.pt
+      - MODEL_PATH=/workspace/online/models/service/soybean/yolov5-soybean.onnx
+      - AI_WORKER_URL=http://ai_worker:8000/infer
+      - AI_WORKER_TIMEOUT=120
     depends_on:
       - mysql
     restart: unless-stopped
 
+  # Online inference service (AI detection API provider)
   ai_worker:
-    build:
-      context: ./pytorch_model
-      dockerfile: Dockerfile
+    image: luodi1999/seedai-ai_worker:${SEEDAI_IMAGE_TAG:-202603101436}
     container_name: seedai-ai_worker-1
     volumes:
       - ./pytorch_model:/workspace
-    
-    depends_on:
-      - backend
+    environment:
+      - MODEL_PATH=/workspace/online/models/service/soybean/yolov5-soybean.onnx
+      - AI_WORKER_PORT=8000
+      - DEFAULT_CONF_THRESHOLD=0.25
+    command: ["python", "online/infer_service/inference.py"]
+    expose:
+      - "8000"
+
     restart: unless-stopped
 
+  # Offline training/export service (manual/cron tasks only)
+  ai_trainer:
+    image: luodi1999/seedai-ai_trainer:${SEEDAI_IMAGE_TAG:-202603101436}
+    container_name: seedai-ai_trainer-1
+    gpus: all
+    working_dir: /workspace
+    volumes:
+      - ./pytorch_model:/workspace
+      - ./data/datasets:/workspace/datasets
+      - ./data/uploads:/workspace/uploads
+
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["bash", "-lc", "sleep infinity"]
+    profiles:
+      - train
+    restart: "no"
+
   frontend:
-    image: nginx:alpine
+    image: luodi1999/seedai-frontend:${SEEDAI_IMAGE_TAG:-202603101436}
+    container_name: seedai-frontend-1
     ports:
       - "80:80"
     volumes:

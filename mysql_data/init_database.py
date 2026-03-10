@@ -8,6 +8,7 @@ import pymysql
 import json
 from datetime import datetime
 import bcrypt
+import subprocess
 
 def get_db_connection():
     """获取数据库连接"""
@@ -66,7 +67,14 @@ def verify_initial_data():
             # 切换到ai_dataset数据库
             cursor.execute("USE ai_dataset;")
             
-            expected_tables = ['users', 'datasets', 'images']
+            expected_tables = [
+                'users',
+                'datasets',
+                'images',
+                'dataset_label_categories',
+                'ai_models',
+                'schema_migrations',
+            ]
             
             for table in expected_tables:
                 cursor.execute(f"SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'ai_dataset' AND table_name = '{table}';")
@@ -101,8 +109,12 @@ def main():
     try:
         # 1. 创建数据库和表结构
         create_database_and_tables()
+
+        # 2. 执行增量迁移，补齐所有后续结构（推荐唯一入口）
+        migrate_script = os.path.join(os.path.dirname(__file__), 'migrate.py')
+        subprocess.run([sys.executable, migrate_script, '--all'], check=True)
         
-        # 2. 验证初始数据
+        # 3. 验证初始数据
         verify_initial_data()
         
         print("\n✓ 数据库初始化完成！")

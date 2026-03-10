@@ -153,8 +153,13 @@
           "name": "上传图片到数据集",
           "method": "POST",
           "endpoint": "/api/datasets/{dataset_id}/upload",
-          "description": "上传图片到指定数据集",
-          "example": {}
+          "description": "上传图片到指定数据集；支持可选同名 annotation(JSON) 文件。annotation 会写入 datasets/<user>/<dataset>_<id>/annotations，并回写 images.annotations_path。前端需保证图片与JSON按文件名一一唯一对应，若同名出现>=3个则整组禁止上传。",
+          "example": {
+            "multipart/form-data": {
+              "file": "seed_001.jpg",
+              "annotation": "seed_001.json"
+            }
+          }
         },
         {
           "name": "获取图片信息",
@@ -191,6 +196,16 @@
               "root"
             ]
           }
+        },
+        {
+          "name": "执行AI检测",
+          "method": "POST",
+          "endpoint": "/api/images/{image_id}/detect",
+          "description": "调用后端AI推理编排接口。后端会把图片转发给ai_worker模型服务，返回标准化检测框（包含类别与置信度）",
+          "example": {
+            "conf_threshold": 0.8,
+            "model_name": "yolov5s"
+          }
         }
       ]
     },
@@ -198,13 +213,6 @@
       "name": "系统",
       "icon": "⚙️",
       "endpoints": [
-        {
-          "name": "健康检查",
-          "method": "GET",
-          "endpoint": "/health",
-          "description": "检查后端服务健康状态",
-          "example": {}
-        },
         {
           "name": "获取API端点定义",
           "method": "GET",
@@ -217,6 +225,56 @@
           "method": "GET",
           "endpoint": "/api/stats",
           "description": "获取首页统计信息",
+          "example": {}
+        }
+      ]
+    },
+    {
+      "name": "模型管理",
+      "icon": "🧠",
+      "endpoints": [
+        {
+          "name": "获取模型列表",
+          "method": "GET",
+          "endpoint": "/api/models",
+          "description": "获取模型配置列表（管理员）",
+          "example": {}
+        },
+        {
+          "name": "创建模型配置",
+          "method": "POST",
+          "endpoint": "/api/models",
+          "description": "创建模型配置（名称、路径、类别列表）",
+          "example": {
+            "model_name": "seed-yolov5",
+            "model_path": "/workspace/online/models/service/soybean/yolov5-soybean.onnx",
+            "class_list": [
+              "腐烂",
+              "发芽",
+              "未发芽"
+            ],
+            "is_active": true
+          }
+        },
+        {
+          "name": "更新模型配置",
+          "method": "PUT",
+          "endpoint": "/api/models/{model_id}",
+          "description": "更新模型名称、路径、类别列表、启用状态（管理员）",
+          "example": {
+            "model_path": "/workspace/online/models/service/soybean/yolov5-soybean.onnx",
+            "class_list": [
+              "腐烂",
+              "发芽",
+              "未发芽"
+            ]
+          }
+        },
+        {
+          "name": "启用指定模型",
+          "method": "POST",
+          "endpoint": "/api/models/{model_id}/activate",
+          "description": "将指定模型设为当前推理默认模型（管理员）",
           "example": {}
         }
       ]

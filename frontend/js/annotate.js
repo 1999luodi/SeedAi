@@ -27,6 +27,9 @@ class ManualAnnotationPage {
         this.drawingStart = null;
         this.mousePoint = null;
         this.selectedBoxId = null;
+        this.activeHandle = null;
+        this.isDraggingHandle = false;
+        this.handleHitSize = 10;
         this.dirty = false;
         this.isPanning = false;
         this.panMoved = false;
@@ -99,6 +102,8 @@ class ManualAnnotationPage {
     }
 
     bindEvents() {
+        this.handleCtrlWheelZoom = this.handleCtrlWheelZoom.bind(this);
+
         this.el.tools.forEach((tool) => {
             tool.addEventListener('click', () => this.setMode(tool.dataset.mode));
         });
@@ -148,6 +153,13 @@ class ManualAnnotationPage {
         this.el.labelFilter.addEventListener('change', () => this.renderLabelList());
         this.el.fileSearch.addEventListener('input', () => this.renderFileList());
 
+        // Intercept Ctrl+wheel on multiple targets/events to reliably suppress browser page zoom.
+        window.addEventListener('wheel', this.handleCtrlWheelZoom, { passive: false, capture: true });
+        document.addEventListener('wheel', this.handleCtrlWheelZoom, { passive: false, capture: true });
+        this.el.canvasWrap.addEventListener('wheel', this.handleCtrlWheelZoom, { passive: false, capture: true });
+        window.addEventListener('mousewheel', this.handleCtrlWheelZoom, { passive: false, capture: true });
+        window.addEventListener('DOMMouseScroll', this.handleCtrlWheelZoom, { passive: false, capture: true });
+
         this.bindNavigationSaveGuard();
 
         document.addEventListener('click', (event) => {
@@ -155,6 +167,30 @@ class ManualAnnotationPage {
                 this.hideContextMenu();
             }
         });
+    }
+
+    handleCtrlWheelZoom(event) {
+        if (!event || !event.ctrlKey) {
+            return;
+        }
+
+        // Block browser-level zoom first.
+        event.preventDefault();
+        if (typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        if (!this.images[this.currentIndex]) {
+            return;
+        }
+
+        const delta = Number(event.deltaY);
+        const direction = Number.isFinite(delta)
+            ? (delta < 0 ? -1 : 1)
+            : ((Number(event.wheelDelta) > 0 || Number(event.detail) < 0) ? -1 : 1);
+
+        const factor = direction < 0 ? 1.1 : 0.9;
+        this.changeZoom(this.zoom * factor);
     }
 
     bindNavigationSaveGuard() {
@@ -302,6 +338,8 @@ class ManualAnnotationPage {
 
     setMode(mode) {
         this.mode = mode;
+        this.activeHandle = null;
+        this.isDraggingHandle = false;
         if (this.mode !== 'bbox') {
             this.mousePoint = null;
             this.drawingStart = null;
@@ -309,6 +347,7 @@ class ManualAnnotationPage {
         }
         this.el.tools.forEach((tool) => tool.classList.toggle('active', tool.dataset.mode === mode));
         this.el.statusText.textContent = `模式: ${this.getModeLabel(this.mode)} | 第 ${this.currentIndex + 1}/${this.images.length} 张`;
+        this.renderLabelList();
         this.hideContextMenu();
     }
 
@@ -585,12 +624,18 @@ class ManualAnnotationPage {
 
     renderLabelList() {
         const visibleBoxes = this.getFilteredBoxes();
+        const editable = this.mode === 'edit';
 
         const boxRows = visibleBoxes.map((box) => {
             const color = this.getCategoryColor(box.label);
             const textColor = this.getContrastingTextColor(color);
+            const selected = this.selectedBoxId === box.localId;
+            const checkedAttr = selected ? 'checked' : '';
+            const activeClass = selected ? ' active' : '';
+            const editableClass = editable ? ' editable' : '';
             return `
-            <div class="ann-label-row" style="--category-color:${color}; --category-text:${textColor};">
+            <div class="ann-label-row ann-label-box-row${activeClass}${editableClass}" data-label-box-select="${this.escapeHtml(box.localId)}" style="--category-color:${color}; --category-text:${textColor};">
+                <input class="ann-list-checkbox" type="checkbox" ${checkedAttr} ${editable ? '' : 'disabled'}>
                 <span class="ann-category-name">${this.escapeHtml(box.label)}</span>
                 <button class="ann-cat-remove" data-label-box-delete="${this.escapeHtml(box.localId)}" type="button" title="删除标注">删除</button>
             </div>
@@ -616,6 +661,25 @@ class ManualAnnotationPage {
                 event.stopPropagation();
                 const localId = button.getAttribute('data-label-box-delete') || '';
                 this.removeBoxByLocalId(localId);
+            });
+        });
+
+        this.el.labelList.querySelectorAll('[data-label-box-select]').forEach((row) => {
+            const checkbox = row.querySelector('.ann-list-checkbox');
+            if (checkbox) {
+                checkbox.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+            }
+
+            row.addEventListener('click', () => {
+                if (this.mode !== 'edit') {
+                    return;
+                }
+                this.selectedBoxId = row.getAttribute('data-label-box-select');
+                this.renderLabelList();
+                this.draw();
             });
         });
 
@@ -731,8 +795,20 @@ class ManualAnnotationPage {
         }
 
         if (this.mode === 'edit') {
+            if (this.selectedBoxId) {
+                const selected = this.boxes.find((item) => item.localId === this.selectedBoxId);
+                const handleName = selected ? this.findHandleByPoint(selected, point) : null;
+                if (handleName) {
+                    this.activeHandle = handleName;
+                    this.isDraggingHandle = true;
+                    this.draw();
+                    return;
+                }
+            }
+
             const hit = this.findBoxByPoint(point);
             this.selectedBoxId = hit ? hit.localId : null;
+            this.renderLabelList();
             this.draw();
         }
     }
@@ -744,6 +820,13 @@ class ManualAnnotationPage {
 
         if (this.isPanning) {
             this.updatePan(event);
+            return;
+        }
+
+        if (this.mode === 'edit' && this.isDraggingHandle) {
+            const point = this.getCanvasPoint(event);
+            this.updateSelectedBoxByHandle(point);
+            this.draw();
             return;
         }
 
@@ -765,6 +848,14 @@ class ManualAnnotationPage {
     handleMouseUp(event) {
         if (this.isPanning) {
             this.finishPan(event);
+            return;
+        }
+
+        if (this.isDraggingHandle) {
+            this.isDraggingHandle = false;
+            this.activeHandle = null;
+            this.renderLabelList();
+            this.draw();
         }
     }
 
@@ -995,6 +1086,66 @@ class ManualAnnotationPage {
         });
     }
 
+    findHandleByPoint(box, point) {
+        const x1 = box.x_min * this.el.canvas.width;
+        const y1 = box.y_min * this.el.canvas.height;
+        const x2 = box.x_max * this.el.canvas.width;
+        const y2 = box.y_max * this.el.canvas.height;
+        const handles = {
+            tl: { x: x1, y: y1 },
+            tr: { x: x2, y: y1 },
+            bl: { x: x1, y: y2 },
+            br: { x: x2, y: y2 }
+        };
+
+        const r = this.handleHitSize;
+        for (const [name, p] of Object.entries(handles)) {
+            if (Math.abs(point.x - p.x) <= r && Math.abs(point.y - p.y) <= r) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    updateSelectedBoxByHandle(point) {
+        if (!this.selectedBoxId || !this.activeHandle) {
+            return;
+        }
+
+        const box = this.boxes.find((item) => item.localId === this.selectedBoxId);
+        if (!box) {
+            return;
+        }
+
+        const w = Math.max(1, this.el.canvas.width);
+        const h = Math.max(1, this.el.canvas.height);
+        const minDx = 2 / w;
+        const minDy = 2 / h;
+
+        const nx = Math.max(0, Math.min(1, point.x / w));
+        const ny = Math.max(0, Math.min(1, point.y / h));
+
+        if (this.activeHandle === 'tl') {
+            box.x_min = Math.min(nx, box.x_max - minDx);
+            box.y_min = Math.min(ny, box.y_max - minDy);
+        } else if (this.activeHandle === 'tr') {
+            box.x_max = Math.max(nx, box.x_min + minDx);
+            box.y_min = Math.min(ny, box.y_max - minDy);
+        } else if (this.activeHandle === 'bl') {
+            box.x_min = Math.min(nx, box.x_max - minDx);
+            box.y_max = Math.max(ny, box.y_min + minDy);
+        } else if (this.activeHandle === 'br') {
+            box.x_max = Math.max(nx, box.x_min + minDx);
+            box.y_max = Math.max(ny, box.y_min + minDy);
+        }
+
+        box.x_min = Math.max(0, Math.min(1, box.x_min));
+        box.y_min = Math.max(0, Math.min(1, box.y_min));
+        box.x_max = Math.max(0, Math.min(1, box.x_max));
+        box.y_max = Math.max(0, Math.min(1, box.y_max));
+        this.dirty = true;
+    }
+
     draw() {
         this.ctx.clearRect(0, 0, this.el.canvas.width, this.el.canvas.height);
 
@@ -1015,6 +1166,23 @@ class ManualAnnotationPage {
             this.ctx.lineWidth = selected ? this.boxStrokeWidth * 2 : this.boxStrokeWidth;
             this.ctx.strokeStyle = color;
             this.ctx.strokeRect(x, y, w, h);
+
+            if (selected && this.mode === 'edit') {
+                const hs = 6;
+                const handles = [
+                    { x, y },
+                    { x: x + w, y },
+                    { x, y: y + h },
+                    { x: x + w, y: y + h }
+                ];
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.strokeStyle = '#ef4444';
+                this.ctx.lineWidth = 2;
+                handles.forEach((p) => {
+                    this.ctx.fillRect(p.x - hs, p.y - hs, hs * 2, hs * 2);
+                    this.ctx.strokeRect(p.x - hs, p.y - hs, hs * 2, hs * 2);
+                });
+            }
 
             this.ctx.fillStyle = color;
             const labelFontSize = 30;
@@ -1150,6 +1318,12 @@ class ManualAnnotationPage {
                 confidence: 1
             }));
 
+            // Persist normalized annotations to DB table first.
+            await this.api(`/images/${image.id}/annotations`, {
+                method: 'PUT',
+                body: JSON.stringify({ annotations: nextAnnotations })
+            });
+
             // Persist category labels and bbox annotations to a dataset COCO file.
             this.writeJson(this.getImageClassKey(image.id), this.classes);
             await this.api(`/images/${image.id}/label-file`, {
@@ -1185,6 +1359,14 @@ class ManualAnnotationPage {
         } catch (error) {
             return fallback;
         }
+    }
+
+    formatCoord(value) {
+        const n = Number(value);
+        if (Number.isNaN(n)) {
+            return '0';
+        }
+        return n.toFixed(4).replace(/\.0+$/, '').replace(/(\.\d*?[1-9])0+$/, '$1');
     }
 
     writeJson(key, value) {
