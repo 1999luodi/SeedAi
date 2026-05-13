@@ -5,6 +5,7 @@ SeedAI 测试工具 - API客户端
 
 import requests
 import json
+import os
 from typing import Dict, Optional, Any
 
 from .api_contract import API_ROUTES, build_route
@@ -12,8 +13,8 @@ from .api_contract import API_ROUTES, build_route
 class APIClient:
     """SeedAI API客户端"""
     
-    def __init__(self, base_url: str = 'http://localhost:5000'):
-        self.base_url = base_url
+    def __init__(self, base_url: str = None):
+        self.base_url = base_url or os.getenv('SEEDAI_BASE_URL', 'http://localhost:5000')
         self.token = None
         self.headers = {'Content-Type': 'application/json'}
     

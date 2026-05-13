@@ -6,12 +6,14 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 - 为模型训练与推理提供标准数据资产
 可视化预览：
 <h3>前台</h3>
-<img width="2306" height="2482" alt="image" src="https://github.com/user-attachments/assets/50f8040b-7272-4687-8edd-088a60d3b9b4" />
-<img width="2306" height="1364" alt="image" src="https://github.com/user-attachments/assets/8ed3f635-81cf-4853-961a-27f78022dba0" />
+
+  <img width="230" height="248" alt="image" src="https://github.com/user-attachments/assets/50f8040b-7272-4687-8edd-088a60d3b9b4" /><br/>
+  <img width="230" height="136" alt="image" src="https://github.com/user-attachments/assets/8ed3f635-81cf-4853-961a-27f78022dba0" />
+
 <h3>后台</h3>
-<img width="2306" height="1801" alt="image" src="https://github.com/user-attachments/assets/46bf1aa8-b638-4021-9fb5-f9a12c180fa9" />
+<img width="230" height="180" alt="image" src="https://github.com/user-attachments/assets/46bf1aa8-b638-4021-9fb5-f9a12c180fa9" />
 <h3>测试</h3>
-<img width="2306" height="1364" alt="image" src="https://github.com/user-attachments/assets/2aa1768c-dd6b-42ef-ae74-8e0a1f6e57fd" />
+<img width="230" height="136" alt="image" src="https://github.com/user-attachments/assets/2aa1768c-dd6b-42ef-ae74-8e0a1f6e57fd" />
 
 
 
@@ -48,7 +50,7 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 
 ## 5. 你最常用的入口
 
-- 前端：`http://localhost/`
+- 前端：`http://localhost/`  账号： user1 密码： 123456<PASSWORD>
 - 后台管理页面：`http://localhost/admin`
 - 数据集操作页（从数据集列表点击“打开”进入）：`http://localhost/dataset-workspace.html?dataset=<id>`
 - API 测试页面：`http://localhost/tests/api-test.html`
@@ -62,9 +64,9 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 
 ## 7. Docker 挂载约定（数据集文件）
 
-- 后端容器挂载目录：`D:/ai-projects/SeedAi/backend/datasets:/app/datasets`
-- 业务文件实际写入：`backend/datasets/<用户名>/<数据集名>_<id>/`
-- 不再使用项目根目录的 `datasets/`。
+- 后端容器挂载目录：`D:/ai-projects/SeedAi/data/datasets:/app/datasets`
+- 业务文件实际写入：`data/datasets/<用户名>/<数据集名>_<id>/`
+- 统一使用项目根目录下的 `data/datasets/`。
 
 ## 8. 数据库迁移
 

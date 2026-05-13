@@ -11,6 +11,8 @@
 ### 使用Docker Compose (推荐)
 
 ```bash
+# 下载docker软件 下载对应的docker(windows/mac/linux)
+
 # 进入项目根目录
 cd d:\ai-projects\SeedAi
 

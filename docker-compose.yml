@@ -5,7 +5,7 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
       MYSQL_DATABASE: ai_dataset
     volumes:
       - ./mysql_data/data:/var/lib/mysql
@@ -26,9 +26,8 @@ services:
     environment:
       - DB_HOST=mysql
       - DB_USER=root
-      - DB_PASSWORD=rootpass
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpass}
       - DB_NAME=ai_dataset
-      - MODEL_PATH=/workspace/online/models/service/soybean/yolov5-soybean.onnx
       - AI_WORKER_URL=http://ai_worker:8000/infer
       - AI_WORKER_TIMEOUT=120
     depends_on:
@@ -43,6 +42,7 @@ services:
       - ./pytorch_model:/workspace
     environment:
       - MODEL_PATH=/workspace/online/models/service/soybean/yolov5-soybean.onnx
+      - AI_WORKER_MODEL_ROOT=/workspace/online/models/service
       - AI_WORKER_PORT=8000
       - DEFAULT_CONF_THRESHOLD=0.25
     command: ["python", "online/infer_service/inference.py"]

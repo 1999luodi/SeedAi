@@ -21,6 +21,7 @@ class TestAdminDashboard:
         """测试初始化"""
         cls.client = APIClient()
         cls.users = []
+        cls.client.login('admin', '123456')
     
     def test_dashboard_load(self):
         """测试1: 仪表板加载"""

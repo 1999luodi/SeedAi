@@ -242,6 +242,11 @@
                         <input type="text" id="api-url" placeholder="输入API端点URL">
                     </div>
                     <div class="form-group">
+                        <label for="path-params">路径参数 (JSON，可选)</label>
+                        <textarea id="path-params" rows="3" placeholder='例如: {"image_id": 532}'></textarea>
+                        <div class="field-hint">用于替换URL中的占位符，如 /api/images/{image_id}/detect。</div>
+                    </div>
+                    <div class="form-group">
                         <label for="request-headers">请求头 (JSON)</label>
                         <textarea id="request-headers" rows="5" placeholder='例如: {"Content-Type":"application/json","Authorization":"Bearer <token>"}'></textarea>
                         <div class="field-hint">你可以在这里手动输入 Authorization。</div>
@@ -329,6 +334,9 @@
         function loadEndpointDetails(endpoint) {
             document.getElementById('api-method').value = endpoint.method;
             document.getElementById('api-url').value = window.location.origin + endpoint.endpoint;
+            document.getElementById('path-params').value = endpoint.path_params
+                ? JSON.stringify(endpoint.path_params, null, 2)
+                : '';
             
             if (endpoint.example && Object.keys(endpoint.example).length > 0) {
                 document.getElementById('request-body').value = JSON.stringify(endpoint.example, null, 2);
@@ -343,7 +351,32 @@
             document.getElementById('request-headers').value = JSON.stringify({
                 "Content-Type": "application/json"
             }, null, 2);
+            document.getElementById('path-params').value = '';
             applyBodyTemplateByMethod();
+        }
+
+        function applyPathParams(urlText, rawPathParams) {
+            if (!rawPathParams) {
+                return urlText;
+            }
+
+            let params = {};
+            try {
+                params = JSON.parse(rawPathParams);
+            } catch (e) {
+                throw new Error('路径参数JSON格式错误: ' + e.message);
+            }
+
+            if (!params || typeof params !== 'object' || Array.isArray(params)) {
+                throw new Error('路径参数必须是JSON对象');
+            }
+
+            return urlText.replace(/\{([^}]+)\}/g, (match, name) => {
+                if (params[name] === undefined || params[name] === null || String(params[name]).trim() === '') {
+                    return match;
+                }
+                return encodeURIComponent(String(params[name]));
+            });
         }
 
         function applyBodyTemplateByMethod() {
@@ -473,11 +506,26 @@
         // 发送API请求
         async function sendRequest() {
             const method = document.getElementById('api-method').value;
-            const url = document.getElementById('api-url').value;
+            const urlInput = document.getElementById('api-url').value;
+            const rawPathParams = document.getElementById('path-params').value.trim();
             const requestBody = document.getElementById('request-body').value.trim();
             const requestHeaders = document.getElementById('request-headers').value.trim();
             const tokenHeaderName = document.getElementById('token-header-name').value.trim();
             const rawTokenHeaderValue = document.getElementById('token-header-value').value.trim();
+
+            let url = urlInput;
+            try {
+                url = applyPathParams(urlInput, rawPathParams);
+            } catch (error) {
+                alert(error.message);
+                return;
+            }
+
+            const hasUnresolvedPathParams = /\{[^}]+\}/.test(url);
+            if (hasUnresolvedPathParams) {
+                alert('URL中仍有未替换的路径参数，请补全“路径参数(JSON)”');
+                return;
+            }
             
             let body = null;
             if (method !== 'GET' && requestBody) {

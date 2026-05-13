@@ -1,9 +1,15 @@
 from models import db, AIModelConfig
 from werkzeug.exceptions import BadRequest
+import glob
+import os
 import re
 
 
 class AIModelService:
+    @staticmethod
+    def _strip_identifier(value):
+        return str(value or '').strip()
+
     @staticmethod
     def _validate_model_name(model_name):
         cleaned_name = str(model_name or '').strip()
@@ -43,6 +49,56 @@ class AIModelService:
         if not model_name:
             return None
         return AIModelConfig.query.filter_by(model_name=str(model_name).strip()).first()
+
+    @staticmethod
+    def get_model_by_identifier(model_identifier):
+        """Resolve model by model_name or ONNX filename (e.g. faster-rcnn.onnx)."""
+        cleaned = AIModelService._strip_identifier(model_identifier)
+        if not cleaned:
+            return None
+
+        exact = AIModelService.get_model_by_name(cleaned)
+        if exact:
+            return exact
+
+        file_name = os.path.basename(cleaned)
+        if file_name.lower().endswith('.onnx'):
+            by_path = AIModelConfig.query.filter(AIModelConfig.model_path.ilike(f"%/{file_name}")).first()
+            if by_path:
+                return by_path
+
+            stem = file_name[:-5]
+            # Support naming variants like faster-rcnn <-> faster-rcnn-soybean.
+            by_prefix = AIModelConfig.query.filter(AIModelConfig.model_name.like(f"{stem}-%")).first()
+            if by_prefix:
+                return by_prefix
+
+        return None
+
+    @staticmethod
+    def resolve_workspace_model_path(model_identifier):
+        """Resolve ai_worker model path for filename identifiers.
+
+        1) Try filesystem lookup when backend mounts /workspace.
+        2) If backend cannot see /workspace, infer a service path so ai_worker can still load it.
+        """
+        cleaned = AIModelService._strip_identifier(model_identifier)
+        if not cleaned:
+            return None
+
+        file_name = os.path.basename(cleaned)
+        if not file_name.lower().endswith('.onnx'):
+            file_name = f"{file_name}.onnx"
+
+        model_root = os.environ.get('AI_WORKER_MODEL_ROOT', '/workspace/online/models/service').rstrip('/')
+        pattern = f"{model_root}/**/{file_name}"
+        matched = sorted(glob.glob(pattern, recursive=True))
+        if matched:
+            return matched[0]
+
+        # Backend container may not mount model files; infer ai_worker-visible path.
+        default_variety = os.environ.get('AI_MODEL_DEFAULT_VARIETY', 'soybean').strip() or 'soybean'
+        return f"{model_root}/{default_variety}/{file_name}"
 
     @staticmethod
     def get_active_model():

@@ -24,6 +24,20 @@ class TestAuthFlow:
         cls.test_username = generate_unique_username()
         cls.test_email = generate_unique_email()
         cls.test_password = "TestPassword123"
+
+    def test_backend_health(self):
+        """测试0: 后端健康检查"""
+        print_section("测试后端健康检查")
+
+        try:
+            response = self.client._request('GET', '/api/stats')
+            assert response.status_code == 200, f"后端不可用: {response.status_code}"
+            body = response.json()
+            assert body.get('success') is True
+            log_test("后端健康检查", True, "后端服务可访问")
+        except Exception as e:
+            log_test("后端健康检查", False, str(e))
+            raise
     
     def test_user_registration(self):
         """测试1: 用户注册"""

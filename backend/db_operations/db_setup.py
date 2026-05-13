@@ -13,7 +13,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from app import app
-from models import User
+from models import db, User
 from services.user_service import UserService
 
 
@@ -53,7 +53,7 @@ def verify_tables():
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         
-        expected_tables = ['users', 'datasets', 'images', 'annotations', 'dataset_label_categories']
+        expected_tables = ['users', 'datasets', 'images', 'dataset_label_categories', 'ai_models']
         existing_tables = inspector.get_table_names()
         
         print("数据库表验证:")

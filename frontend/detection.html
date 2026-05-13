@@ -529,12 +529,13 @@
                         <div class="config-row">
                             <label for="modelSelect">选择模型 :</label>
                             <select id="modelSelect">
-                                <option value="" selected>默认模型(后端激活)</option>
+                                <option value="faster-rcnn.onnx">Faster-RCNN </option>
+                                <option value="yolov5-soybean.onnx">YOLOv5 Soybean</option>
                             </select>
                         </div>
                         <div class="config-row">
                             <label for="thresholdInput">设置阈值 :</label>
-                            <input id="thresholdInput" type="number" min="0" max="1" step="0.01" value="0.80">
+                            <input id="thresholdInput" type="number" min="0" max="1" step="0.01" value="0.8">
                         </div>
                         <div class="config-row" style="display:none;">
                             <label for="imageSelect">图片 :</label>
@@ -549,6 +550,7 @@
                             <button id="showAiBtn" class="btn btn-secondary">显示AI检测</button>
                         </div>
                         <div class="counter-line">文件计数: <span id="counterText">0 / 0</span></div>
+                        <div class="counter-line">检测状态: <span id="detectStatus">未执行</span></div>
                     </div>
                 </aside>
 
@@ -624,6 +626,7 @@
                 this.classColorMap = new Map();
                 this.classPalette = ['#e11d48', '#0ea5e9', '#16a34a', '#f59e0b', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#dc2626', '#2563eb'];
                 this.currentClassList = [];
+                this.thresholdTouched = false;
 
                 this.bindElements();
                 this.bindEvents();
@@ -664,6 +667,7 @@
                 this.metaAnnotated = document.getElementById('metaAnnotated');
                 this.counterText = document.getElementById('counterText');
                 this.modeText = document.getElementById('modeText');
+                this.detectStatus = document.getElementById('detectStatus');
 
                 this.viewerImage = document.getElementById('viewerImage');
                 this.viewerCanvas = document.getElementById('viewerCanvas');
@@ -678,6 +682,10 @@
                 this.detectBtn.addEventListener('click', () => this.runDetection());
                 this.saveBtn.addEventListener('click', () => this.saveAnnotations());
                 this.exportBtn.addEventListener('click', () => this.exportResults());
+                this.modelSelect.addEventListener('change', () => this.syncThresholdByModel(false));
+                this.thresholdInput.addEventListener('input', () => {
+                    this.thresholdTouched = true;
+                });
                 this.showOriginalBtn.addEventListener('click', () => this.setViewMode('original'));
                 this.showAiBtn.addEventListener('click', () => this.setViewMode('ai'));
                 this.prevBtn.addEventListener('click', () => this.goRelative(-1));
@@ -756,6 +764,23 @@
                     this.canvasWrap.classList.remove('space-pan');
                     this.stopPanning();
                 });
+
+                this.syncThresholdByModel(false);
+            }
+
+            syncThresholdByModel(forceUpdate) {
+                const modelName = String((this.modelSelect && this.modelSelect.value) || '').toLowerCase();
+                let suggested = 0.25;
+                if (modelName.includes('faster-rcnn') || modelName.includes('mmdet')) {
+                    suggested = 0.05;
+                }
+
+                const shouldApply = forceUpdate || !this.thresholdTouched;
+                if (!shouldApply) {
+                    return;
+                }
+
+                this.thresholdInput.value = suggested.toFixed(2);
             }
 
             stopPanning() {
@@ -1017,6 +1042,7 @@
 
                 this.detectBtn.disabled = true;
                 this.detectBtn.innerHTML = '<span class="spinner"></span> 检测中...';
+                this.detectStatus.textContent = '检测中...';
 
                 try {
                     const selectedModelName = String(this.modelSelect.value || '').trim();
@@ -1031,6 +1057,8 @@
                     const responseData = (payload && payload.data) || {};
                     this.currentClassList = Array.isArray(responseData.class_list) ? responseData.class_list : [];
                     this.aiAnnotations = this.normalizeAnnotationList(responseData.annotations || [], true);
+                    const modelText = responseData.model_name || String(this.modelSelect.value || 'default');
+                    this.detectStatus.textContent = `完成: 模型 ${modelText}，阈值 ${this.formatNumber(threshold, 2)}，检测到 ${this.aiAnnotations.length} 个目标`;
                     this.selectedOriginIndex = -1;
                     this.selectedAiIndex = this.aiAnnotations.length > 0 ? 0 : -1;
                     this.setViewMode('ai');
@@ -1039,6 +1067,7 @@
                     this.saveBtn.disabled = this.aiAnnotations.length === 0;
                     this.exportBtn.disabled = this.aiAnnotations.length === 0;
                 } catch (error) {
+                    this.detectStatus.textContent = `失败: ${error.message || 'AI检测失败'}`;
                     alert(error.message || 'AI检测失败');
                 } finally {
                     this.detectBtn.disabled = false;
@@ -1306,11 +1335,17 @@
                     x_min: ann.x_min,
                     y_min: ann.y_min,
                     x_max: ann.x_max,
-                    y_max: ann.y_max
+                    y_max: ann.y_max,
+                    confidence: ann.confidence
                 }));
 
+                const classes = Array.from(new Set(cleanRows.map((row) => String(row.label || '').trim()).filter(Boolean)));
+
                 try {
-                    await SeedAI.api.put(`/images/${this.currentImage.id}/annotations`, { annotations: cleanRows });
+                    await SeedAI.api.post(`/images/${this.currentImage.id}/label-file`, {
+                        classes,
+                        annotations: cleanRows
+                    });
                     alert('保存成功，标注文件已覆盖并更新数据库路径');
                     this.originalAnnotations = cleanRows.map((row, idx) => Object.assign({ id: idx + 1, confidence: 1 }, row));
                     this.setViewMode('original');
@@ -1384,6 +1419,9 @@
                     this.counterTextBottom.textContent = '0';
                 }
                 this.avgConfidence.textContent = '0%';
+                if (this.detectStatus) {
+                    this.detectStatus.textContent = '未执行';
+                }
                 this.originList.innerHTML = '<div class="result-empty">暂无原始标注</div>';
                 this.aiList.innerHTML = '<div class="result-empty">暂无AI检测结果</div>';
 

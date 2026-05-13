@@ -27,15 +27,15 @@
 ## 4. 数据集文件存储规则（当前实现）
 
 - 上传接口：`POST /api/datasets/<dataset_id>/upload`
-- 文件落盘目录：`backend/datasets/<用户名>/<数据集名>_<dataset_id>/`
+- 文件落盘目录：`data/datasets/<用户名>/<数据集名>_<dataset_id>/`
 - 文件命名规则：`<unix时间戳>_<原始文件名>`
 - 上传权限：仅数据集拥有者或可访问该公开数据集的用户
 
-示例路径：`backend/datasets/user3/soybean_4/1741421234_image.jpg`
+示例路径：`data/datasets/user3/soybean_4/1741421234_image.jpg`
 
-说明：`config.py` 中 `DATASETS_FOLDER` 指向 `backend/datasets/`。
+说明：`config.py` 中 `DATASETS_FOLDER`（容器内 `/app/datasets`）在宿主机映射到 `data/datasets/`。
 
-Docker Compose 挂载约定：`D:/ai-projects/SeedAi/backend/datasets:/app/datasets`。
+Docker Compose 挂载约定：`D:/ai-projects/SeedAi/data/datasets:/app/datasets`。
 
 ## 5. 数据集相关前端行为（与后端配合）
 

@@ -1,11 +1,12 @@
 import os
+import secrets
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard to guess string'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
     
     # 从环境变量获取数据库配置，默认为本地开发配置
     @staticmethod
@@ -32,5 +33,11 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
     
     # JWT配置
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-string'
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1小时
+
+    # Comma-separated list, e.g. "http://localhost,http://127.0.0.1".
+    CORS_ORIGINS = [
+        item.strip() for item in os.environ.get('CORS_ORIGINS', 'http://localhost,http://127.0.0.1').split(',')
+        if item.strip()
+    ]

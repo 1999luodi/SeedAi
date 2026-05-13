@@ -32,8 +32,8 @@ def create_app():
     # 初始化扩展
     db.init_app(app)
     
-    # 启用CORS，允许来自前端的请求
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # 启用CORS，默认限制为本地开发来源。
+    CORS(app, resources={r"/api/*": {"origins": app.config.get('CORS_ORIGINS', [])}})
     
     # 设置日志
     logging.basicConfig(level=logging.INFO)
@@ -304,8 +304,8 @@ def register():
         if not username or not email or not password:
             return create_response(False, 'Username, email and password are required', status_code=400)
 
-        UserService.register_user(username, email, password)
-        return create_response(True, 'User registered successfully')
+        user = UserService.register_user(username, email, password)
+        return create_response(True, 'User registered successfully', user, status_code=201)
     except BadRequest as e:
         # 返回业务可读错误（如用户名或邮箱已存在）
         return create_response(False, str(e.description or e), status_code=400)
@@ -367,6 +367,53 @@ def get_user_profile(current_user):
         'success': True,
         'data': current_user.to_dict()
     })
+
+
+@app.route('/api/users/profile', methods=['PUT'])
+@token_required
+def update_user_profile(current_user):
+    """修改当前登录用户信息"""
+    try:
+        data = request.get_json() or {}
+        if not data:
+            return create_response(False, 'No data provided', status_code=400)
+
+        if 'password' in data:
+            return create_response(False, 'Password update requires separate endpoint', status_code=400)
+
+        allowed_fields = ['email', 'username']
+        update_data = {k: v for k, v in data.items() if k in allowed_fields}
+        if not update_data:
+            return create_response(False, 'No updatable fields provided', status_code=400)
+
+        user = UserService.update_user(current_user.id, update_data)
+        return create_response(True, 'Profile updated successfully', user)
+    except BadRequest as e:
+        return create_response(False, str(e.description or e), status_code=400)
+    except Exception as e:
+        logger.error(f"Update profile error: {str(e)}")
+        return create_response(False, 'Internal server error', status_code=500)
+
+
+@app.route('/api/stats', methods=['GET'])
+def get_public_stats():
+    """首页公开统计接口"""
+    try:
+        return jsonify({
+            'success': True,
+            'total_images': ImageService.get_image_count(),
+            'total_datasets': DatasetService.get_dataset_count(),
+            'active_users': User.query.filter_by(is_active=True).count()
+        })
+    except Exception as e:
+        logger.error(f"Get public stats error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Failed to load stats',
+            'total_images': 0,
+            'total_datasets': 0,
+            'active_users': 0
+        }), 500
 
 @app.route('/api/users/<int:user_id>', methods=['GET'])
 @token_required
@@ -766,25 +813,20 @@ def detect_image(current_user, image_id):
 
         model_row = None
         if requested_model_name:
-            model_row = AIModelService.get_model_by_name(requested_model_name)
-            if not model_row:
-                return create_response(False, f"Model not found: {requested_model_name}", status_code=400)
+            model_row = AIModelService.get_model_by_identifier(requested_model_name)
         else:
             model_row = AIModelService.get_active_model()
 
         model_name = requested_model_name or 'default'
-        model_path = None
         class_names = None
         if model_row:
             model_name = model_row.model_name
-            model_path = model_row.model_path
             class_names = model_row.get_class_list()
 
         ai_result = _call_ai_worker_infer(
             image_file_path=image.file_path,
             conf_threshold=conf_threshold,
             model_name=model_name,
-            model_path=model_path,
             class_names=class_names,
         )
 
@@ -793,6 +835,7 @@ def detect_image(current_user, image_id):
             return create_response(False, message or 'AI detection failed', status_code=502)
 
         data = ai_result.get('data') or {}
+        model_path = data.get('model_path') if isinstance(data, dict) else None
         image_width = max(float(data.get('image_width') or image.width or 1), 1.0)
         image_height = max(float(data.get('image_height') or image.height or 1), 1.0)
         detections = data.get('detections') if isinstance(data.get('detections'), list) else []
@@ -1065,9 +1108,12 @@ def admin_dashboard(current_user):
 def admin_users_page(current_user):
     if current_user.role < 2:  # 超级管理员才能访问
         return jsonify({'success': False, 'message': 'Access denied'}), 403
-    
-    users = UserService.get_all_users()
-    return render_template('admin/users.html', users=[user.to_admin_dict() for user in users], current_user=current_user)
+
+    users = User.query.all()
+    for user in users:
+        user.dataset_count = Dataset.query.filter_by(created_by=user.id).count()
+
+    return render_template('admin/users.html', users=users, current_user=current_user)
 
 @app.route('/admin/datasets')
 @login_required_html
@@ -1404,4 +1450,5 @@ def set_session_token(current_user):
         return create_response(False, 'Failed to set session token', status_code=500)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug_mode = os.environ.get('FLASK_DEBUG', '').strip().lower() in {'1', 'true', 'yes'}
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
