@@ -30,4 +30,6 @@ env/
 *.swo
 /process-data/data/
 
+*.onnx
+
 
