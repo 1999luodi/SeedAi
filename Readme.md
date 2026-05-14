@@ -6,14 +6,12 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 - 为模型训练与推理提供标准数据资产
 可视化预览：
 <h3>前台</h3>
-
-  <img width="230" height="248" alt="image" src="https://github.com/user-attachments/assets/50f8040b-7272-4687-8edd-088a60d3b9b4" /><br/>
-  <img width="230" height="136" alt="image" src="https://github.com/user-attachments/assets/8ed3f635-81cf-4853-961a-27f78022dba0" />
-
+<img width="2306" height="2482" alt="image" src="https://github.com/user-attachments/assets/50f8040b-7272-4687-8edd-088a60d3b9b4" />
+<img width="2306" height="1364" alt="image" src="https://github.com/user-attachments/assets/8ed3f635-81cf-4853-961a-27f78022dba0" />
 <h3>后台</h3>
-<img width="230" height="180" alt="image" src="https://github.com/user-attachments/assets/46bf1aa8-b638-4021-9fb5-f9a12c180fa9" />
+<img width="2306" height="1801" alt="image" src="https://github.com/user-attachments/assets/46bf1aa8-b638-4021-9fb5-f9a12c180fa9" />
 <h3>测试</h3>
-<img width="230" height="136" alt="image" src="https://github.com/user-attachments/assets/2aa1768c-dd6b-42ef-ae74-8e0a1f6e57fd" />
+<img width="2306" height="1364" alt="image" src="https://github.com/user-attachments/assets/2aa1768c-dd6b-42ef-ae74-8e0a1f6e57fd" />
 
 
 
