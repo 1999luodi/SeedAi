@@ -6,7 +6,10 @@ SeedAI 是一个面向图像数据集管理与标注的工程化项目，核心�
 - 为模型训练与推理提供标准数据资产
 
 视频说明：
-<video src="SeedAI.mp4" controls="controls" width="100%" height="100%"></video>
+<video src="https://github.com/user-attachments/assets/47bb2c84-aef6-4b12-bcce-a4a4d40eb2ea" width="100%" controls>
+</video>
+
+
 
 
 
