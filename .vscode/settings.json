@@ -17,7 +17,8 @@
             "driver": "MySQL",
             "name": "seedAi",
             "database": "ai_dataset",
-            "username": "root"
+            "username": "root",
+            "askForPassword": true
         }
     ],
     "python-envs.defaultEnvManager": "ms-python.python:conda",

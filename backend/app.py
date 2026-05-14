@@ -7,7 +7,7 @@ import os
 # 添加当前目录到Python路径，确保能导入同目录下的模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models import db, User, Dataset, Image
+from models import db, User, Dataset, Image, AIModelConfig
 from services.user_service import UserService
 from services.dataset_service import DatasetService
 from services.image_service import ImageService
@@ -117,6 +117,27 @@ def _call_ai_worker_infer(image_file_path, conf_threshold=0.25, model_name='defa
         raise RuntimeError(f"AI worker HTTP {error.code}: {detail}")
     except urllib.error.URLError as error:
         raise RuntimeError(f"AI worker unavailable: {error}")
+
+
+def _map_detection_label(item, class_names):
+    """Normalize detection label to class name using ONNX class_id index directly."""
+    raw_label = str((item or {}).get('label', '') or '').strip()
+    if not class_names:
+        return raw_label or 'unknown'
+
+    if raw_label and not raw_label.isdigit():
+        return raw_label
+
+    raw_class_id = (item or {}).get('class_id', raw_label)
+    try:
+        class_id = int(raw_class_id)
+    except (TypeError, ValueError):
+        return raw_label or 'unknown'
+
+    if 0 <= class_id < len(class_names):
+        return str(class_names[class_id])
+
+    return raw_label or str(class_id)
 
 def create_response(success, message, data=None, status_code=200):
     """创建标准响应格式"""
@@ -810,23 +831,35 @@ def detect_image(current_user, image_id):
         payload = request.get_json(silent=True) or {}
         conf_threshold = payload.get('conf_threshold', 0.25)
         requested_model_name = str(payload.get('model_name', '') or '').strip()
+        requested_model_id = payload.get('model_id')
 
         model_row = None
-        if requested_model_name:
+        if requested_model_id is not None:
+            try:
+                model_id = int(requested_model_id)
+            except (TypeError, ValueError):
+                return create_response(False, "model_id must be an integer", status_code=400)
+            model_row = AIModelConfig.query.get(model_id)
+            if not model_row:
+                return create_response(False, "Model not found", status_code=404)
+        elif requested_model_name:
             model_row = AIModelService.get_model_by_identifier(requested_model_name)
         else:
             model_row = AIModelService.get_active_model()
 
         model_name = requested_model_name or 'default'
         class_names = None
+        model_path = None
         if model_row:
             model_name = model_row.model_name
             class_names = model_row.get_class_list()
+            model_path = model_row.model_path
 
         ai_result = _call_ai_worker_infer(
             image_file_path=image.file_path,
             conf_threshold=conf_threshold,
             model_name=model_name,
+            model_path=model_path,
             class_names=class_names,
         )
 
@@ -876,7 +909,7 @@ def detect_image(current_user, image_id):
 
             normalized.append({
                 'id': index,
-                'label': str(item.get('label', 'unknown')),
+                'label': _map_detection_label(item, class_names),
                 'x_min': max(0.0, min(1.0, x1 / image_width)),
                 'y_min': max(0.0, min(1.0, y1 / image_height)),
                 'x_max': max(0.0, min(1.0, x2 / image_width)),
@@ -1330,8 +1363,6 @@ def api_endpoints():
 @token_required
 def list_models(current_user):
     try:
-        if current_user.role < 1:
-            return create_response(False, "Insufficient permissions", status_code=403)
         rows = AIModelService.list_models()
         return create_response(True, "Models retrieved", rows)
     except Exception as e:

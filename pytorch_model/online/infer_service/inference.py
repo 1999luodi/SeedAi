@@ -16,6 +16,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def resolve_label_from_class_id(class_id: int, class_names: Optional[List[str]]) -> str:
+    """Map model class id to configured class name using ONNX output index directly."""
+    if not class_names:
+        return str(class_id)
+
+    if 0 <= class_id < len(class_names):
+        return str(class_names[class_id])
+
+    return str(class_id)
+
+
 class InferenceEngine:
     def __init__(self, model_path: Optional[str] = None, conf_threshold: float = 0.25):
         self.conf_threshold = conf_threshold
@@ -237,9 +248,7 @@ class InferenceEngine:
         detections: List[Dict] = []
         for i in idxs.flatten().tolist():
             class_id = class_ids[i]
-            label = str(class_id)
-            if class_names and 0 <= class_id < len(class_names):
-                label = str(class_names[class_id])
+            label = resolve_label_from_class_id(class_id, class_names)
 
             detections.append(
                 {
@@ -342,9 +351,7 @@ class InferenceEngine:
             class_id = int(labels[i])
             if class_id < 0:
                 continue
-            label = str(class_id)
-            if class_names and 0 <= class_id < len(class_names):
-                label = str(class_names[class_id])
+            label = resolve_label_from_class_id(class_id, class_names)
 
             detections.append(
                 {
